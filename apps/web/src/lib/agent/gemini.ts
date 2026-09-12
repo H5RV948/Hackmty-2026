@@ -35,8 +35,13 @@ const MODELOS = [
 /** Indice del modelo que sabemos que responde. Se recuerda entre requests. */
 let modeloActivo = 0;
 
+function textoDe(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/** El modelo no sirve para esta cuenta hoy: cuota agotada o no existe. */
 function esCuotaONoExiste(error: unknown): boolean {
-  const texto = error instanceof Error ? error.message : String(error);
+  const texto = textoDe(error);
   return (
     texto.includes("RESOURCE_EXHAUSTED") ||
     texto.includes("429") ||
@@ -44,6 +49,24 @@ function esCuotaONoExiste(error: unknown): boolean {
     texto.includes("no longer available")
   );
 }
+
+/**
+ * Saturacion pasajera del lado de Google (503 UNAVAILABLE), no un problema de
+ * la cuenta. Distinguirlo del 429 importa: aqui el mismo modelo si va a volver
+ * a funcionar en unos segundos, asi que conviene reintentarlo antes de irnos a
+ * otro que quiza sea peor para la tarea.
+ */
+function esSaturacionPasajera(error: unknown): boolean {
+  const texto = textoDe(error);
+  return (
+    texto.includes("UNAVAILABLE") ||
+    texto.includes("503") ||
+    texto.includes("overloaded") ||
+    texto.includes("high demand")
+  );
+}
+
+const esperar = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
  * Corre `fn` con el modelo activo y, si se topa con cuota o el modelo no
@@ -55,17 +78,31 @@ async function conModeloDisponible<T>(fn: (modelo: string) => Promise<T>): Promi
   for (let i = 0; i < MODELOS.length; i++) {
     const indice = (modeloActivo + i) % MODELOS.length;
     const modelo = MODELOS[indice];
-    try {
-      const resultado = await fn(modelo);
-      if (indice !== modeloActivo) {
-        console.warn(`[gemini] cambiando a ${modelo} (el anterior no estaba disponible)`);
-        modeloActivo = indice;
+
+    // Dos intentos con el mismo modelo: el segundo solo ocurre si el primero
+    // fallo por saturacion pasajera.
+    for (let intento = 0; intento < 2; intento++) {
+      try {
+        const resultado = await fn(modelo);
+        if (indice !== modeloActivo) {
+          console.warn(`[gemini] cambiando a ${modelo} (el anterior no estaba disponible)`);
+          modeloActivo = indice;
+        }
+        return resultado;
+      } catch (error) {
+        ultimoError = error;
+
+        if (esSaturacionPasajera(error) && intento === 0) {
+          console.warn(`[gemini] ${modelo} saturado, reintentando en 2s`);
+          await esperar(2000);
+          continue;
+        }
+        if (esSaturacionPasajera(error) || esCuotaONoExiste(error)) {
+          console.warn(`[gemini] ${modelo} no disponible, probando el siguiente`);
+          break;
+        }
+        throw error;
       }
-      return resultado;
-    } catch (error) {
-      if (!esCuotaONoExiste(error)) throw error;
-      console.warn(`[gemini] ${modelo} no disponible, probando el siguiente`);
-      ultimoError = error;
     }
   }
 
@@ -127,7 +164,12 @@ Reglas que no se negocian:
   cabeza, nunca inventes un saldo, una tasa, un CAT o un pago mensual.
 - Si vas a hablar de reestructurar un saldo, llama simulate_restructure y usa
   sus numeros tal cual vienen.
-- Empieza por get_financial_profile para saber con quien hablas.
+- Empieza por get_financial_profile para saber con quien hablas. Te va a
+  devolver un clienteId: GUARDALO y pasalo a todas las demas tools. Si no lo
+  pasas, cada tool elige otro cliente al azar y mezclarias a dos personas
+  distintas en la misma pantalla.
+- Ya sabes como se llama: hablale por su nombre de pila, una o dos veces, sin
+  abusar. Nada de repetir el nombre completo en cada frase.
 - No llames apply_restructure_plan salvo que el evento del usuario sea una
   confirmacion explicita hecha en la UI generada.
 - El dominio es reestructura de deuda de tarjeta de credito. No inventes

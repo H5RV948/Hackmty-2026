@@ -26,7 +26,11 @@ type RequestBody = { event: ClientEvent; surfaces?: string[] };
 /** El agente razona sobre texto, no sobre la forma interna del evento. */
 function intentFromEvent(event: ClientEvent): string | null {
   if (event.type === "user_message") {
-    return `El usuario escribio: "${event.text}"`;
+    // Consulta nueva: aqui SI se cambia de cliente.
+    return [
+      `El usuario escribio: "${event.text}"`,
+      `Es una consulta nueva: llama get_financial_profile con nuevoCaso: true.`,
+    ].join(" ");
   }
 
   if (event.type === "ui_action") {
@@ -35,6 +39,9 @@ function intentFromEvent(event: ClientEvent): string | null {
       `El usuario interactuo con la pantalla que le generaste.`,
       `Evento "${event.name}" en el componente "${event.componentId}" de la surface "${event.surfaceId}"${payload}.`,
       `Actualiza la pantalla segun lo que esto te dice de el.`,
+      `Sigue siendo la MISMA persona: llama get_financial_profile SIN nuevoCaso`,
+      `y reutiliza su clienteId. Cambiar de cliente aqui mezclaria dos personas`,
+      `en la misma pantalla.`,
       `Si el evento confirma una accion explicitamente, recien ahi puedes ejecutar una tool de tipo write.`,
     ].join(" ");
   }

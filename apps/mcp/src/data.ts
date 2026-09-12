@@ -93,6 +93,10 @@ function bool(value: string | undefined): boolean {
 
 export type Cliente = {
   id: string;
+  nombre: string;
+  apellidoPaterno: string;
+  apellidoMaterno: string;
+  nombreCompleto: string;
   tipoCliente: string;
   edad: number | null;
   ingresoMensual: number | null;
@@ -114,8 +118,12 @@ export type Cliente = {
   productoInteres: string;
 };
 
-export const clientes: Cliente[] = readSeed("clientes_sintetico.csv").map((r) => ({
+export const clientes: Cliente[] = readSeed("clientes_sintetico_con_nombres.csv").map((r) => ({
   id: r.cliente_id,
+  nombre: r.nombre,
+  apellidoPaterno: r.apellido_paterno,
+  apellidoMaterno: r.apellido_materno,
+  nombreCompleto: r.nombre_completo,
   tipoCliente: r.tipo_cliente,
   edad: num(r.edad),
   ingresoMensual: num(r.ingreso_mensual_mxn) ?? num(r.ventas_mensuales_mxn),
@@ -138,21 +146,81 @@ export const clientes: Cliente[] = readSeed("clientes_sintetico.csv").map((r) =>
 }));
 
 /**
- * Cliente por defecto de la demo: persona fisica, 96.4% de su limite usado y
- * "Pagar deudas" como objetivo. Es el caso que mejor cuenta la historia de
- * reestructura. Se puede pedir cualquier otro por clienteId.
+ * Cliente de respaldo: persona fisica, 96.4% de su limite usado y "Pagar
+ * deudas" como objetivo. Es el caso que mejor cuenta la historia de
+ * reestructura, y el que se usa cuando el modo aleatorio esta apagado.
  */
 export const DEFAULT_CLIENTE_ID = "CLI131";
-
-export function getCliente(id?: string): Cliente | undefined {
-  if (!id) return clientes.find((c) => c.id === DEFAULT_CLIENTE_ID);
-  const buscado = id.trim().toUpperCase();
-  return clientes.find((c) => c.id.toUpperCase() === buscado);
-}
 
 export const clientesConTarjeta = clientes.filter(
   (c) => c.tieneTarjetaCredito && (c.saldoTarjeta ?? 0) > 0,
 );
+
+/**
+ * Universo del que sale el cliente al azar de la demo.
+ *
+ * Solo personas fisicas: una persona moral tiene razon social en vez de nombre
+ * de pila, y el asesor termina tuteando a "Grupo Empresarial del Bajio SA de
+ * CV". El reto es asesoria financiera personal, asi que las empresas siguen
+ * disponibles por clienteId pero no salen sorteadas.
+ */
+export const clientesDemo = clientesConTarjeta.filter(
+  (c) => c.tipoCliente.toLowerCase().startsWith("persona f"),
+);
+
+/**
+ * Modo demo: sin clienteId, cada consulta toma un cliente distinto al azar.
+ *
+ * Existe SOLO para la demo, donde no hay sesion y queremos que dos preguntas
+ * seguidas no cuenten la misma historia. En una app real el cliente sale del
+ * usuario autenticado y esto no aplica: apagalo con DEMO_RANDOM_CLIENT=false.
+ *
+ * Ojo importante: el azar es por LLAMADA, no por conversacion. Si el agente
+ * pide el perfil y luego simula sin pasar el clienteId que recibio, mezclaria
+ * dos clientes distintos en la misma pantalla. Por eso simulate_restructure
+ * exige el id explicitamente en vez de elegir uno por su cuenta.
+ */
+export const DEMO_RANDOM_CLIENTE = process.env.DEMO_RANDOM_CLIENT !== "false";
+
+function clienteAlAzar(): Cliente | undefined {
+  const pool =
+    clientesDemo.length > 0
+      ? clientesDemo
+      : clientesConTarjeta.length > 0
+        ? clientesConTarjeta
+        : clientes;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+/**
+ * Cliente de la conversacion en curso.
+ *
+ * Sortear en CADA llamada era un bug: al picar un boton de la pantalla
+ * generada se dispara otra consulta, el agente volvia a pedir el perfil y le
+ * tocaba otra persona. Resultado: una pantalla que saludaba a Fernando arriba
+ * y a Carmen abajo, con cifras de dos personas mezcladas.
+ *
+ * Ahora el sorteo ocurre una sola vez y se conserva hasta que alguien pida
+ * explicitamente un caso nuevo (nuevoCaso), lo cual hace el endpoint del
+ * agente solo cuando el usuario escribe una consulta desde la barra.
+ */
+let clienteSesion: Cliente | undefined;
+
+export function rotarClienteSesion(): Cliente | undefined {
+  clienteSesion = DEMO_RANDOM_CLIENTE
+    ? clienteAlAzar()
+    : clientes.find((c) => c.id === DEFAULT_CLIENTE_ID);
+  return clienteSesion;
+}
+
+export function getCliente(id?: string, nuevoCaso = false): Cliente | undefined {
+  if (id) {
+    const buscado = id.trim().toUpperCase();
+    return clientes.find((c) => c.id.toUpperCase() === buscado);
+  }
+  if (nuevoCaso || !clienteSesion) return rotarClienteSesion();
+  return clienteSesion;
+}
 
 /* ------------------------------------------------------------------ */
 /* Catalogo de tarjetas                                                */
@@ -161,6 +229,12 @@ export const clientesConTarjeta = clientes.filter(
 export type ProductoTarjeta = {
   categoria: string;
   producto: string;
+  /** Nombre como aparece en el sitio; es el que ve el usuario. */
+  nombreDisplay: string;
+  /** Beneficios cortos, tal cual los publica Banorte. */
+  bullets: string[];
+  /** Ruta de la imagen del plastico dentro de apps/web/public. */
+  imagen: string;
   segmento: string;
   tipoCliente: string;
   red: string;
@@ -179,6 +253,9 @@ export type ProductoTarjeta = {
 export const catalogoTarjetas: ProductoTarjeta[] = readSeed("catalogo_tarjetas.csv").map((r) => ({
   categoria: r.categoria,
   producto: r.producto,
+  nombreDisplay: r.nombre_display || r.producto,
+  bullets: (r.bullets || "").split("|").map((b) => b.trim()).filter(Boolean),
+  imagen: r.imagen || "",
   segmento: r.segmento,
   tipoCliente: r.tipo_cliente,
   red: r.red,
@@ -194,8 +271,16 @@ export const catalogoTarjetas: ProductoTarjeta[] = readSeed("catalogo_tarjetas.c
   fechaVerificacion: r.fecha_verificacion,
 }));
 
-export const tarjetasCredito = catalogoTarjetas.filter((t) =>
-  t.categoria.toLowerCase().includes("crédito"),
+/**
+ * Solo tarjetas de credito para PERSONA, no lineas empresariales.
+ *
+ * El filtro anterior era `includes("crédito")`, que tambien dejaba pasar
+ * "Credito empresarial": el asesor termino recomendandole "Credito Empuje
+ * Negocios" y "Tarjeta Corporativa" a una persona fisica asalariada. El reto
+ * es asesoria personal, asi que el universo son las 12 tarjetas del sitio.
+ */
+export const tarjetasCredito = catalogoTarjetas.filter(
+  (t) => t.categoria.toLowerCase() === "crédito personal",
 );
 
 /* ------------------------------------------------------------------ */

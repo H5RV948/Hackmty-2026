@@ -30,3 +30,53 @@ body {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+/*
+ * Anillo de carga de la barra del prompt.
+ *
+ * Es un trazo que recorre el contorno, no un degradado girando: sobre una
+ * figura tan alargada como la pildora, un conic-gradient se lee como parpadeo
+ * y no como movimiento. Aqui se anima stroke-dashoffset sobre el contorno real.
+ *
+ * El SVG usa pathLength="100", asi que el guion y el hueco van en porcentaje
+ * del perimetro y el efecto se ve igual sea cual sea el ancho de la barra.
+ */
+@keyframes recorrer-anillo {
+  to { stroke-dashoffset: -100; }
+}
+
+.anillo-trazo {
+  stroke-dasharray: 22 78;
+  stroke-dashoffset: 0;
+  animation: recorrer-anillo 1.6s linear infinite;
+}
+
+/*
+ * Spinner dentro de un boton de la pantalla generada.
+ *
+ * La clase la pone A2UIRenderer sobre el boton que el usuario acaba de picar,
+ * en vez de que cada uno de los doce widgets maneje su propio estado de carga.
+ * `currentColor` hereda el color del texto del boton, asi que se ve bien tanto
+ * en los rojos solidos como en los de contorno.
+ */
+@keyframes girar-boton {
+  to { transform: rotate(360deg); }
+}
+
+.boton-cargando {
+  pointer-events: none;
+  opacity: 0.9;
+}
+
+.boton-cargando::after {
+  content: "";
+  display: inline-block;
+  width: 0.85em;
+  height: 0.85em;
+  margin-left: 0.5em;
+  vertical-align: -0.12em;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 9999px;
+  animation: girar-boton 0.7s linear infinite;
+}

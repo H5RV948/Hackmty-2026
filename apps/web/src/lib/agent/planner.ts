@@ -41,10 +41,42 @@ Reglas duras:
   NUNCA metas x/y/w/h dentro de un componente: el validador lo rechaza.
 - Solo puedes usar los componentes del catalogo de abajo, con sus props. Si un
   componente que quieres no existe, usa uno que si exista. Prohibido inventar.
-- El grid es de 12 columnas. Usa w: 6 para dos widgets lado a lado.
+- El grid es de 12 columnas y cada unidad de alto son 72px.
+
+ALTURAS (importante: sobra espacio blanco cuando te pasas):
+  Text, Stat                     -> h: 2
+  ExplorationCard                -> h: 3
+  FinancialHealthCard            -> h: 3
+  UnderstandingSummary           -> h: 3
+  DebtSimulator                  -> h: 4
+  OpportunityGrid con 2 opciones -> h: 4
+  OptionComparator con 2-3       -> h: 4
+  Ajusta +1 solo si el texto es largo de verdad. Nunca pongas h mayor a 5.
+
+LAYOUT — una sola regla, pero se rompe seguido:
+  updateCanvasLayout reemplaza el layout COMPLETO. Incluye SIEMPRE todas las
+  surfaces que existan, no solo las nuevas, o las viejas se descolocan y el
+  canvas queda escalonado.
+  Usa w: 6 para dos widgets lado a lado (x: 0 y x: 6 con el mismo y), o w: 12
+  para uno que ocupe el ancho.
 - Un prop "bindable" acepta un literal o un binding { "path": "/ruta" }. Si usas
   binding, manda tambien el updateDataModel con esa ruta.
 - targetId de updateGuidance es el id de un componente que ya emitiste.
+
+UN COMPONENTE DE PRIMER NIVEL = UNA SURFACE:
+  El renderer dibuja desde "root" y baja por "children". Si metes dos
+  componentes sueltos en la misma surface, solo se dibuja el root y el otro
+  desaparece sin error.
+  Asi que CardRanking y CardShowcase van en DOS surfaces distintas, cada una
+  con su createSurface, su updateComponents y su entrada en updateCanvasLayout.
+
+ROOT — el segundo error mas comun:
+  "root" tiene que ser el id de un componente que va en ESE MISMO mensaje
+  updateComponents. No apunta a otro mensaje, ni a un contenedor que no
+  existe, ni a una palabra generica como "root" o "cards".
+  Si mandas un solo componente, root es su id:
+  { "updateComponents": { "surfaceId": "s1", "root": "mis-tarjetas",
+      "components": [ { "id": "mis-tarjetas", "component": "CardShowcase", ... } ] } }
 
 FORMA EXACTA DE action (el error mas comun, leelo dos veces):
   "action": { "event": { "name": "nombre_del_evento", "payload": { ... } } }
@@ -60,7 +92,13 @@ formato y sin simbolo de peso; el formato lo pone la UI):
 - ExplorationCard.opciones:     [{ "id": "...", "label": "..." }]
 - UnderstandingSummary:         objetivoEntendido texto, supuestos arreglo de textos, confianza NUMERO entre 0 y 1
 - DebtSimulator:                saldo, plazoSeleccionado, cat y pagoMensual son NUMEROS, plazos es arreglo de numeros
+- CardShowcase.tarjetas:        [{ "id": "...", "nombre": "Clásica", "imagen": "/tarjetas/clasica.png", "bullets": ["...","..."], "cat": 121.4, "anualidad": 695, "fuente": "https://...", "fechaVerificacion": "2026-09-12" }]
+- CardRanking.barras:           [{ "id": "...", "nombre": "Clásica", "puntaje": 82, "porQue": "Sin anualidad el primer anio y CAT de 121.4%." }]
 - Copy de la UI en espanol, claro, sin jerga bancaria.
+- Los datos de herramienta traen el NOMBRE del cliente. Usalo: dirigete a la
+  persona por su nombre de pila al menos una vez, en el titulo o en la lectura
+  principal ("Asi se ve tu mes, Beatriz"). Una o dos veces basta; repetirlo en
+  cada componente suena a plantilla.
 
 Reglas de producto:
 - TODA cifra en pesos viene de los datos de herramienta que te paso. Copiala tal
@@ -69,6 +107,34 @@ Reglas de producto:
   Nunca "te recomendamos contratar X" sin alternativas y sin costos.
 - Los datos son sinteticos y de ejemplo.
 - ExplorationCard va de una pregunta a la vez, nunca un cuestionario.
+
+CUANDO EL USUARIO PREGUNTE POR TARJETAS — DOS COMPONENTES, SIEMPRE LOS DOS:
+  Si mandas uno sin el otro el plan se rechaza completo. No es una sugerencia.
+  Llama get_card_catalog y emite:
+  1. CardRanking con EXACTAMENTE TRES tarjetas, de mayor a menor conveniencia
+     para ESTE cliente. El puntaje va de 0 a 100 y lo decides tu comparando su
+     ingreso, su uso de linea y su score contra el ingreso minimo, el CAT y la
+     anualidad de cada producto. En "porQue" explica en una linea usando una
+     cifra concreta de la tool.
+  2. CardShowcase con esas mismas tres (o mas si el usuario pidio ver todas).
+     nombre, imagen, bullets, cat, anualidad, fuente y fechaVerificacion se
+     copian TAL CUAL de get_card_catalog. La imagen nunca te la inventes: si la
+     tool no trae ruta, omite esa tarjeta.
+
+  El puntaje es tu juicio y esta bien que lo sea; el CAT, la anualidad y el
+  ingreso minimo NO son tu juicio y tienen que venir de la tool sin retocar.
+
+  Si tu conclusion es que a esta persona NO le conviene una tarjeta nueva
+  todavia —porque trae la linea al tope, score bajo o pagos atrasados—, esa es
+  una respuesta valida y correcta. Pero DIBUJALA: un FinancialHealthCard con el
+  porque y sus cifras, y el CardRanking con las tres que menos mal le quedarian
+  y puntajes bajos que lo digan. Jamas cierres una consulta con puro texto: el
+  producto es un tablero.
+
+NO USES ActionPlan. El producto es un tablero que explica la situacion y sus
+opciones con su costo, no un flujo de contratacion. Nada de "pasos sugeridos"
+ni botones de confirmar un plan. Si quieres cerrar, cierra con datos y con las
+alternativas a la vista, no con una llamada a la accion.
 
 Catalogo de componentes permitidos:
 `;
@@ -137,7 +203,31 @@ function normalize(candidate: unknown): unknown {
     return candidate;
   }
   const obj = candidate as Record<string, unknown>;
-  return "version" in obj ? obj : { version: A2UI_VERSION, ...obj };
+  const conVersion = "version" in obj ? obj : { version: A2UI_VERSION, ...obj };
+
+  /*
+   * El modelo pone seguido un `root` que no corresponde a ningun componente
+   * del mensaje ("root", "cards", el id de otro mensaje). Cuando el mensaje
+   * trae UN solo componente no hay ambiguedad posible: el root es ese. Lo
+   * corregimos aqui en vez de gastar un intento de reparacion.
+   *
+   * Con dos o mas componentes no adivinamos: ahi si que lo resuelva el modelo,
+   * porque elegir mal cambiaria la pantalla en silencio.
+   */
+  const uc = (conVersion as { updateComponents?: unknown }).updateComponents;
+  if (uc && typeof uc === "object") {
+    const bloque = uc as { root?: unknown; components?: unknown };
+    const comps = Array.isArray(bloque.components) ? bloque.components : [];
+    const ids = comps
+      .map((c) => (typeof c === "object" && c !== null ? (c as { id?: unknown }).id : undefined))
+      .filter((id): id is string => typeof id === "string");
+
+    if (comps.length === 1 && typeof bloque.root === "string" && !ids.includes(bloque.root)) {
+      return { ...conVersion, updateComponents: { ...bloque, root: ids[0] } };
+    }
+  }
+
+  return conVersion;
 }
 
 /**
@@ -168,6 +258,91 @@ function explicar(candidate: unknown, errors: string[]): string {
     )}). Cada mensaje lleva exactamente una: separalos.`;
   }
   return `la clave "${claves[0]}" existe pero su contenido no cumple el esquema (revisa campos obligatorios y tipos).`;
+}
+
+/**
+ * Reglas de producto que el validador del protocolo no puede ver.
+ *
+ * `validateA2UI` comprueba que el mensaje cumpla la spec, no que la pantalla
+ * tenga sentido. "Si muestras el ranking, muestra tambien las tarjetas" es una
+ * decision nuestra, y pedirla en el prompt no basta: el modelo la cumple casi
+ * siempre, y "casi" no sirve cuando el jurado ve la pantalla una vez.
+ *
+ * Devuelve errores en el mismo formato que el validador para que entren al
+ * ciclo de reparacion sin tratamiento especial.
+ */
+function revisarReglas(messages: A2UIMessage[], intent: string): string[] {
+  const usados = new Set<string>();
+  for (const m of messages) {
+    if ("updateComponents" in m) {
+      for (const c of m.updateComponents.components) usados.add(c.component);
+    }
+  }
+
+  const errores: string[] = [];
+
+  /*
+   * Componentes huerfanos: el renderer dibuja desde `root` y baja por
+   * `children`. Un componente que esta en el mensaje pero que nadie alcanza
+   * no se dibuja NUNCA — y como el mensaje es valido para la spec, el
+   * validador lo deja pasar sin decir nada.
+   *
+   * Es justo lo que pasaba con las tarjetas: el planner metia CardRanking y
+   * CardShowcase en la misma surface, ponia el ranking como root, y el
+   * showcase se perdia en silencio. Se veia un plan correcto y media pantalla.
+   */
+  for (const m of messages) {
+    if (!("updateComponents" in m)) continue;
+    const { surfaceId, components, root } = m.updateComponents;
+    const raiz = root ?? components[0]?.id;
+    const alcanzables = new Set<string>(raiz ? [raiz] : []);
+    let creció = true;
+    while (creció) {
+      creció = false;
+      for (const c of components) {
+        if (!alcanzables.has(c.id)) continue;
+        for (const hijo of c.children ?? []) {
+          if (!alcanzables.has(hijo)) { alcanzables.add(hijo); creció = true; }
+        }
+      }
+    }
+    const huerfanos = components.filter((c) => !alcanzables.has(c.id));
+    if (huerfanos.length > 0) {
+      errores.push(
+        `En la surface "${surfaceId}" estos componentes no se dibujarian nunca porque nadie los alcanza desde root "${raiz}": ${huerfanos
+          .map((c) => `${c.id} (${c.component})`)
+          .join(", ")}. Cada componente de primer nivel necesita SU PROPIA surface (con su createSurface y su entrada en updateCanvasLayout), o tiene que estar listado en "children" de un componente que si se alcance.`,
+      );
+    }
+  }
+
+  /*
+   * Si preguntaron por tarjetas, la pantalla tiene que traerlas. Aunque la
+   * conclusion sea "todavia no te conviene ninguna", esa respuesta se dibuja:
+   * el producto es un tablero, y cerrar con un parrafo de texto es justo lo
+   * que no queremos. El modelo se saltaba esto cuando el cliente venia mal.
+   */
+  const preguntaronPorTarjetas = /tarjeta/i.test(intent);
+  if (preguntaronPorTarjetas && !usados.has("CardShowcase") && !usados.has("CardRanking")) {
+    errores.push(
+      "El usuario pregunto por tarjetas y no emitiste ni CardRanking ni CardShowcase. Aunque tu conclusion sea que no le conviene ninguna todavia, dibujala: CardRanking con las tres menos malas y puntajes bajos que lo digan, y CardShowcase con esas mismas. No cierres una consulta de tarjetas sin ensenar tarjetas.",
+    );
+  }
+
+  if (usados.has("CardRanking") && !usados.has("CardShowcase")) {
+    errores.push(
+      "Emitiste CardRanking sin CardShowcase. El ranking dice cual conviene pero no ensenia las tarjetas: agrega una surface con CardShowcase de esas mismas tres, copiando imagen, bullets, cat y anualidad de get_card_catalog.",
+    );
+  }
+  if (usados.has("CardShowcase") && !usados.has("CardRanking")) {
+    errores.push(
+      "Emitiste CardShowcase sin CardRanking. Falta la grafica de barras que ordena las tres por conveniencia para este cliente.",
+    );
+  }
+  if (usados.has("ActionPlan")) {
+    errores.push("Usaste ActionPlan y esta prohibido: el producto es un tablero, no un flujo de contratacion. Cambialo por datos y alternativas con su costo.");
+  }
+  return errores;
 }
 
 /** Surface minima para cuando el planner no logra producir algo valido. */
@@ -240,8 +415,13 @@ export async function planSurfaces(
       );
     });
 
+    // El protocolo puede estar bien y la pantalla seguir incompleta.
     if (errors.length === 0 && valid.length > 0) {
-      return { messages: valid, repairs: attempt, fellBack: false };
+      const faltantes = revisarReglas(valid, intent);
+      if (faltantes.length === 0) {
+        return { messages: valid, repairs: attempt, fellBack: false };
+      }
+      errors.push(...faltantes);
     }
 
     console.warn(

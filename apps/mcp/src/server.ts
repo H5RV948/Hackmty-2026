@@ -69,16 +69,22 @@ function buildServer(): McpServer {
     "get_financial_profile",
     {
       description:
-        "[read] Perfil de un cliente: ingreso, gastos, capacidad de ahorro, saldo y limite de tarjeta, uso del limite, score y nivel de endeudamiento. Si no mandas clienteId devuelve el cliente de la demo. Datos sinteticos.",
+        "[read] Perfil de un cliente: nombre, ingreso, gastos, capacidad de ahorro, saldo y limite de tarjeta, uso del limite, score y nivel de endeudamiento. Sin clienteId devuelve el cliente de la conversacion en curso, el mismo entre llamadas. Guarda el clienteId que te devuelve y pasalo a las demas tools. Datos sinteticos.",
       inputSchema: {
         clienteId: z
           .string()
           .optional()
-          .describe(`Id tipo "CLI131". Por defecto ${DEFAULT_CLIENTE_ID}.`),
+          .describe(`Id tipo "CLI131". Si lo omites se usa el cliente de la conversacion.`),
+        nuevoCaso: z
+          .boolean()
+          .optional()
+          .describe(
+            "Solo true cuando el usuario abre una consulta NUEVA desde la barra de texto. Cambia de cliente. Nunca lo pongas al reaccionar a un boton de la pantalla generada.",
+          ),
       },
     },
-    async ({ clienteId }) => {
-      const cliente = getCliente(clienteId);
+    async ({ clienteId, nuevoCaso }) => {
+      const cliente = getCliente(clienteId, nuevoCaso === true);
       if (!cliente) {
         return fail(
           `No existe el cliente "${clienteId}". Hay ${clientes.length} clientes con ids tipo CLI001. Usa list_clients si necesitas uno.`,
@@ -120,6 +126,7 @@ function buildServer(): McpServer {
         total: clientesConTarjeta.length,
         clientes: clientesConTarjeta.slice(0, limite ?? 10).map((c) => ({
           id: c.id,
+          nombre: c.nombreCompleto,
           edad: c.edad,
           saldoTarjeta: c.saldoTarjeta,
           usoLimitePct: c.usoLimitePct,
@@ -134,9 +141,11 @@ function buildServer(): McpServer {
     "simulate_restructure",
     {
       description:
-        "[read] Simula reestructurar el saldo de tarjeta de un cliente. Devuelve pago mensual, CAT, costo total e intereses por plazo. Usa SIEMPRE esta tool para los numeros: no los estimes.",
+        "[read] Simula reestructurar el saldo de tarjeta de un cliente. Devuelve pago mensual, CAT, costo total e intereses por plazo. Usa SIEMPRE esta tool para los numeros: no los estimes. El clienteId es obligatorio y debe ser el mismo de get_financial_profile.",
       inputSchema: {
-        clienteId: z.string().optional(),
+        clienteId: z
+          .string()
+          .describe("Obligatorio: el mismo que te devolvio get_financial_profile."),
         saldo: z
           .number()
           .positive()
@@ -145,6 +154,8 @@ function buildServer(): McpServer {
       },
     },
     async ({ clienteId, saldo }) => {
+      // Sin id explicito se elegiria otro cliente al azar y los numeros de la
+      // pantalla no cuadrarian con el perfil que ya mostro el agente.
       const cliente = getCliente(clienteId);
       if (!cliente) return fail(`No existe el cliente "${clienteId}".`);
 
@@ -170,7 +181,7 @@ function buildServer(): McpServer {
     "get_card_catalog",
     {
       description:
-        "[read] Catalogo de tarjetas de credito Banorte con CAT, tasa, comision anual, MSI, requisitos y la fuente oficial de cada producto. Cita siempre fuente y fechaVerificacion junto a cualquier cifra de este catalogo.",
+        "[read] Catalogo de tarjetas de credito Banorte: nombreDisplay, imagen del plastico, bullets de beneficios, CAT, tasa, comision anual, MSI, requisitos y la fuente oficial. Usalo para CardShowcase y CardRanking. Copia imagen, cat y anualidad tal cual: no los reescribas.",
       inputSchema: {
         ingresoMensual: z
           .number()

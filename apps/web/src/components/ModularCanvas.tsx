@@ -42,6 +42,8 @@ type Props = {
   order: string[];
   layout: GridItem[];
   editable: boolean;
+  /** Componente que disparo la consulta en curso; muestra spinner en su boton. */
+  busyId?: string | null;
   onEvent: (event: ClientEvent) => void;
   onLayoutChange: (items: GridItem[]) => void;
 };
@@ -51,26 +53,39 @@ export function ModularCanvas({
   order,
   layout,
   editable,
+  busyId,
   onEvent,
   onLayoutChange,
 }: Props) {
-  // Surfaces sin posicion explicita caen apiladas al final.
-  const rglLayout = useMemo(
-    () =>
-      order.map((surfaceId, index) => {
-        const item = layout.find((l) => l.surfaceId === surfaceId);
+  /**
+   * Surfaces sin posicion explicita van debajo de todo, no escalonadas.
+   *
+   * Antes caian en `y: index * 4`, que ignora donde termina lo ya colocado: al
+   * llegar una surface nueva el canvas se veia en diagonal. Ahora se apilan a
+   * partir del fondo real del layout vigente.
+   */
+  const rglLayout = useMemo(() => {
+    const fondo = layout.reduce((max, l) => Math.max(max, l.y + l.h), 0);
+    let siguiente = fondo;
+
+    return order.map((surfaceId) => {
+      const item = layout.find((l) => l.surfaceId === surfaceId);
+      if (item) {
         return {
           i: surfaceId,
-          x: item?.x ?? 0,
-          y: item?.y ?? index * 4,
-          w: item?.w ?? 6,
-          h: item?.h ?? 4,
-          minW: item?.minW ?? 3,
-          minH: item?.minH ?? 3,
+          x: item.x,
+          y: item.y,
+          w: item.w,
+          h: item.h,
+          minW: item.minW ?? 3,
+          minH: item.minH ?? 2,
         };
-      }),
-    [order, layout],
-  );
+      }
+      const y = siguiente;
+      siguiente += 3;
+      return { i: surfaceId, x: 0, y, w: 12, h: 3, minW: 3, minH: 2 };
+    });
+  }, [order, layout]);
 
   if (order.length === 0) {
     return (
@@ -115,7 +130,7 @@ export function ModularCanvas({
               <span className="text-xs text-muted">{surface.title ?? surface.surfaceId}</span>
             </header>
             <div className="p-4">
-              <A2UIRenderer surface={surface} onEvent={onEvent} />
+              <A2UIRenderer surface={surface} onEvent={onEvent} busyId={busyId} />
             </div>
           </article>
         );

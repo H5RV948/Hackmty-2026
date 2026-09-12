@@ -23,6 +23,8 @@ export const ComponentRegistry: Record<string, ComponentType<WidgetProps>> = {
   DebtSimulator: W.DebtSimulator,
   OptionComparator: W.OptionComparator,
   ActionPlan: W.ActionPlan,
+  CardShowcase: W.CardShowcase,
+  CardRanking: W.CardRanking,
 };
 
 export function isRegistered(type: string): boolean {

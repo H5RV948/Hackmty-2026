@@ -315,3 +315,141 @@ export function ActionPlan({ titulo, pasos, emit, action }: WidgetProps) {
     </section>
   );
 }
+
+/* ---------------------------------------------------------------- */
+/* Tarjetas de credito                                               */
+/* ---------------------------------------------------------------- */
+
+type FichaTarjeta = {
+  id: string;
+  nombre: string;
+  imagen: string;
+  bullets?: string[];
+  cat?: number;
+  anualidad?: number;
+  fuente?: string;
+  fechaVerificacion?: string;
+};
+
+/**
+ * Vitrina de tarjetas.
+ *
+ * En reposo solo se ve el plastico. El detalle aparece al pasar el cursor,
+ * igual que en el sitio de Banorte: la imagen sola se lee de un vistazo, y los
+ * beneficios estorban cuando estas comparando doce productos.
+ *
+ * El hover es `group-hover` de CSS, no estado de React: sin re-render no hay
+ * parpadeo, y en touch —donde no hay hover— el detalle queda visible siempre
+ * gracias a la variante `max-lg:opacity-100`.
+ */
+export function CardShowcase({ titulo, tarjetas, emit, action }: WidgetProps) {
+  const lista = Array.isArray(tarjetas) ? (tarjetas as FichaTarjeta[]) : [];
+  const name =
+    (action as { event?: { name?: string } } | undefined)?.event?.name ?? "card_selected";
+
+  return (
+    <section>
+      <h3 className="text-base font-semibold text-ink">{String(titulo ?? "")}</h3>
+
+      <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {lista.map((t) => (
+          <article
+            key={t.id}
+            className="group relative overflow-hidden rounded-xl border border-line bg-surface p-4"
+          >
+            <img
+              src={t.imagen}
+              alt={t.nombre}
+              loading="lazy"
+              className="mx-auto h-28 w-auto object-contain transition-transform duration-200 group-hover:scale-[1.03]"
+            />
+
+            <p className="mt-3 text-center text-sm font-semibold text-ink">{t.nombre}</p>
+
+            {typeof t.cat === "number" && (
+              <p className="mt-1 text-center text-xs text-muted">
+                CAT promedio <span className="tnum font-medium text-ink">{t.cat}%</span>
+                {typeof t.anualidad === "number" && (
+                  <> · anualidad <span className="tnum font-medium text-ink">{money(t.anualidad)}</span></>
+                )}
+              </p>
+            )}
+
+            <div className="pointer-events-none absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-surface via-surface/95 to-transparent p-4 opacity-0 transition-opacity duration-200 group-hover:pointer-events-auto group-hover:opacity-100 max-lg:pointer-events-auto max-lg:static max-lg:bg-none max-lg:p-0 max-lg:pt-3 max-lg:opacity-100">
+              <ul className="space-y-1">
+                {(t.bullets ?? []).map((b) => (
+                  <li key={b} className="flex gap-2 text-xs leading-relaxed text-muted">
+                    <span aria-hidden className="mt-[6px] h-1 w-1 shrink-0 rounded-full bg-brand" />
+                    {b}
+                  </li>
+                ))}
+              </ul>
+
+              <button
+                type="button"
+                onClick={() => emit(name, { cardId: t.id, nombre: t.nombre })}
+                className="mt-3 self-start rounded-md bg-brand px-4 py-2 text-xs font-semibold text-white"
+              >
+                Ver mas
+              </button>
+
+              {t.fuente && (
+                <p className="mt-2 text-[10px] leading-tight text-muted">
+                  Fuente oficial{t.fechaVerificacion ? ` · vigente al ${t.fechaVerificacion}` : ""}
+                </p>
+              )}
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/**
+ * Ranking en barras horizontales.
+ *
+ * Barras y no dona ni radar: la pregunta es "cual me conviene mas", que es una
+ * comparacion de magnitudes en una sola dimension, y para eso la longitud es la
+ * codificacion que el ojo compara mejor.
+ */
+export function CardRanking({ titulo, criterio, barras }: WidgetProps) {
+  const lista = Array.isArray(barras)
+    ? (barras as { id: string; nombre: string; puntaje: number; porQue?: string }[])
+    : [];
+  const tope = Math.max(100, ...lista.map((b) => Number(b.puntaje) || 0));
+
+  return (
+    <section>
+      <h3 className="text-base font-semibold text-ink">{String(titulo ?? "")}</h3>
+      {criterio ? <p className="mt-1 text-xs text-muted">{String(criterio)}</p> : null}
+
+      <ol className="mt-4 space-y-3">
+        {lista.map((b, i) => {
+          const pct = Math.max(0, Math.min(100, (Number(b.puntaje) || 0) / tope * 100));
+          return (
+            <li key={b.id}>
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="text-sm font-medium text-ink">
+                  <span className="text-muted">{i + 1}.</span> {b.nombre}
+                </span>
+                <span className="tnum text-xs text-muted">{Math.round(Number(b.puntaje) || 0)}</span>
+              </div>
+
+              <div className="mt-1 h-2.5 w-full overflow-hidden rounded-full bg-line">
+                {/* El primer lugar va en rojo pleno; los otros en rojo suave,
+                    para que el orden se lea sin tener que comparar longitudes. */}
+                <div
+                  className={i === 0 ? "h-full rounded-full bg-brand" : "h-full rounded-full bg-brand/40"}
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+
+              {b.porQue ? <p className="mt-1 text-xs text-muted">{b.porQue}</p> : null}
+            </li>
+          );
+        })}
+      </ol>
+    </section>
+  );
+}
