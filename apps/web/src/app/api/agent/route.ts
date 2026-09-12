@@ -1,155 +1,110 @@
 /**
- * Endpoint del agente.
+ * Endpoint del agente — FASE 4.
  *
- * FASE 2 (actual): responde con un guion fijo para poder trabajar el renderer
- * y el canvas sin gastar tokens. Todo mensaje pasa por validateA2UI.
+ * Ciclo por request:
+ *   evento de UI -> intencion en texto
+ *                -> agente razonador con tools MCP (de ahi salen las cifras)
+ *                -> surface planner (A2UI limitado al catalogo)
+ *                -> validateA2UI + ciclo de reparacion
+ *                -> stream NDJSON al canvas
  *
- * FASE 4: reemplazar `scriptedResponse` por:
- *   1. agente razonador con herramientas MCP (MCP_SERVER_URL),
- *   2. surface planner con salida estructurada limitada al catalogo,
- *   3. ciclo de reparacion con los errores del validador (max 2 intentos),
- *   4. fallback a la surface `fallback-text`.
+ * Lo que cambio respecto a la fase 2: ya no hay guion fijo, y los eventos
+ * `ui_action` SI regresan al agente como contexto — antes se ignoraban, que
+ * era justo lo que rompia el ciclo adaptativo del reto.
  */
-import { validateA2UI, CATALOG_ID, A2UI_VERSION } from "@banorte/a2ui";
+import { validateA2UI } from "@banorte/a2ui";
 import type { A2UIMessage, ClientEvent } from "@banorte/a2ui";
+import { openMcpSession } from "@/lib/agent/mcp";
+import { reason } from "@/lib/agent/gemini";
+import { fallbackSurface, planSurfaces } from "@/lib/agent/planner";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
+
+type RequestBody = { event: ClientEvent; surfaces?: string[] };
+
+/** El agente razona sobre texto, no sobre la forma interna del evento. */
+function intentFromEvent(event: ClientEvent): string | null {
+  if (event.type === "user_message") {
+    return `El usuario escribio: "${event.text}"`;
+  }
+
+  if (event.type === "ui_action") {
+    const payload = event.payload ? ` con estos datos: ${JSON.stringify(event.payload)}` : "";
+    return [
+      `El usuario interactuo con la pantalla que le generaste.`,
+      `Evento "${event.name}" en el componente "${event.componentId}" de la surface "${event.surfaceId}"${payload}.`,
+      `Actualiza la pantalla segun lo que esto te dice de el.`,
+      `Si el evento confirma una accion explicitamente, recien ahi puedes ejecutar una tool de tipo write.`,
+    ].join(" ");
+  }
+
+  // canvas_layout_changed no regenera UI: reacomodar widgets no es una intencion.
+  return null;
+}
 
 export async function POST(request: Request) {
-  const { event } = (await request.json()) as { event: ClientEvent };
-  const messages = scriptedResponse(event);
+  const { event, surfaces = [] } = (await request.json()) as RequestBody;
+  const intent = intentFromEvent(event);
+
+  const encoder = new TextEncoder();
 
   const stream = new ReadableStream({
     async start(controller) {
-      const encoder = new TextEncoder();
-      for (const message of messages) {
+      const send = (message: A2UIMessage) => {
+        // Cinturon y tirantes: el planner ya valido, pero el fallback y
+        // cualquier mensaje futuro tambien tienen que pasar por aqui.
         const result = validateA2UI(message);
         if (!result.ok) {
-          console.error("[a2ui] mensaje invalido:", result.errors);
-          continue; // en fase 4 esto dispara el ciclo de reparacion
+          console.error("[a2ui] mensaje invalido, no se envia:", result.errors);
+          return;
         }
         controller.enqueue(encoder.encode(JSON.stringify(result.message) + "\n"));
-        await new Promise((r) => setTimeout(r, 120)); // render incremental
+      };
+
+      if (!intent) {
+        controller.close();
+        return;
       }
-      controller.close();
+
+      let mcp: Awaited<ReturnType<typeof openMcpSession>> | null = null;
+      try {
+        mcp = await openMcpSession();
+        const reasoning = await reason(intent, mcp);
+        const plan = await planSurfaces(intent, reasoning, surfaces);
+
+        if (plan.fellBack) {
+          console.warn("[agent] el planner no produjo A2UI valido, va el fallback");
+        } else if (plan.repairs > 0) {
+          console.info(`[agent] A2UI valido despues de ${plan.repairs} reparacion(es)`);
+        }
+
+        for (const message of plan.messages) {
+          send(message);
+          // Render incremental: el canvas se va armando a la vista.
+          await new Promise((resolve) => setTimeout(resolve, 80));
+        }
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        console.error("[agent] fallo:", detail);
+        // En desarrollo el error va a la pantalla: perseguir esto en los logs
+        // de Docker cuesta mucho mas que leerlo aqui. En produccion se
+        // mostraria un mensaje generico.
+        const visible =
+          process.env.NODE_ENV === "development"
+            ? `No pude armar tu pantalla. Error: ${detail}`
+            : "No pude armar tu pantalla en este momento. Intenta de nuevo.";
+        for (const message of fallbackSurface(visible)) {
+          send(message);
+        }
+      } finally {
+        await mcp?.close().catch(() => undefined);
+        controller.close();
+      }
     },
   });
 
   return new Response(stream, {
     headers: { "Content-Type": "application/x-ndjson", "Cache-Control": "no-cache" },
   });
-}
-
-function scriptedResponse(event: ClientEvent): A2UIMessage[] {
-  if (event.type !== "user_message") return [];
-
-  return [
-    {
-      version: A2UI_VERSION,
-      createSurface: { surfaceId: "diagnostico", catalogId: CATALOG_ID, title: "Tu situacion" },
-    },
-    {
-      version: A2UI_VERSION,
-      updateComponents: {
-        surfaceId: "diagnostico",
-        root: "salud",
-        components: [
-          {
-            id: "salud",
-            component: "FinancialHealthCard",
-            titulo: "Asi se ve tu mes",
-            lectura:
-              "Tu tarjeta concentra la mayor parte de lo que pagas en intereses. Si mueves ese saldo a un plazo fijo, bajas el pago mensual, aunque el costo total sube.",
-            metricas: { path: "/resumen/metricas" },
-          },
-        ],
-      },
-    },
-    {
-      version: A2UI_VERSION,
-      updateDataModel: {
-        surfaceId: "diagnostico",
-        path: "/resumen",
-        value: {
-          metricas: [
-            { label: "Saldo de tarjeta", value: "$18,400", tone: "critical" },
-            { label: "Pago minimo", value: "$1,840", tone: "warning" },
-            { label: "Intereses del mes", value: "$497", tone: "warning" },
-          ],
-        },
-      },
-    },
-    {
-      version: A2UI_VERSION,
-      createSurface: { surfaceId: "posibilidades", catalogId: CATALOG_ID, title: "Que puedes hacer" },
-    },
-    {
-      version: A2UI_VERSION,
-      updateComponents: {
-        surfaceId: "posibilidades",
-        root: "oportunidades",
-        components: [
-          {
-            id: "oportunidades",
-            component: "OpportunityGrid",
-            titulo: "Caminos posibles, tu decides cual explorar",
-            opciones: { path: "/opciones/lista" },
-            action: { event: { name: "opportunity_selected" } },
-          },
-        ],
-      },
-    },
-    {
-      version: A2UI_VERSION,
-      updateDataModel: {
-        surfaceId: "posibilidades",
-        path: "/opciones",
-        value: {
-          lista: [
-            {
-              id: "reestructura",
-              titulo: "Reestructurar el saldo a plazo fijo",
-              porQue: "Bajas el pago mensual y dejas de pagar intereses revolventes.",
-              impactoEstimado: "Hasta $860 menos al mes",
-            },
-            {
-              id: "pago-dirigido",
-              titulo: "Atacar el saldo sin reestructurar",
-              porQue: "Pagas mas al mes pero terminas antes y te cuesta menos.",
-              impactoEstimado: "Ahorras $2,300 en intereses",
-            },
-          ],
-        },
-      },
-    },
-    {
-      version: A2UI_VERSION,
-      updateCanvasLayout: {
-        items: [
-          { surfaceId: "diagnostico", x: 0, y: 0, w: 6, h: 4 },
-          { surfaceId: "posibilidades", x: 6, y: 0, w: 6, h: 4 },
-        ],
-      },
-    },
-    {
-      version: A2UI_VERSION,
-      updateGuidance: {
-        steps: [
-          {
-            targetId: "salud",
-            title: "Empieza por aqui",
-            body: "Este es el numero que mas te esta costando hoy.",
-            side: "right",
-          },
-          {
-            targetId: "oportunidades",
-            title: "Elige que explorar",
-            body: "Selecciona un camino y te hago un par de preguntas cortas para afinarlo.",
-            side: "left",
-          },
-        ],
-        trigger: "auto",
-      },
-    },
-  ];
 }

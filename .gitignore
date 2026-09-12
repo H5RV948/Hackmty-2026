@@ -4,3 +4,7 @@ dist
 .env
 *.log
 docs/
+
+# Logs de depuracion y salidas de herramientas: locales, no van al repo.
+logc/
+Claude outputs/

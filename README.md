@@ -6,7 +6,7 @@ acciones, A2UI para la interfaz.
 ## Arranque
 
 ```bash
-cp .env.example .env      # pon tu ANTHROPIC_API_KEY
+cp .env.example .env      # pon tu GEMINI_API_KEY
 docker compose up --build
 ```
 

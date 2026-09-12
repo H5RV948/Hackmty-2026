@@ -10,8 +10,8 @@ services:
       # Hot reload confiable en WSL2 / Docker Desktop
       WATCHPACK_POLLING: "true"
       CHOKIDAR_USEPOLLING: "true"
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
-      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-4-6}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
       MCP_SERVER_URL: ${MCP_SERVER_URL:-http://mcp:8787/mcp}
     volumes:
       - ./apps/web:/app/apps/web

@@ -13,9 +13,25 @@ import { useMemo } from "react";
 import type { ClientEvent, GridItem, SurfaceState } from "@banorte/a2ui";
 import { A2UIRenderer } from "./A2UIRenderer";
 
+/**
+ * react-grid-layout@1.5 se publica como CommonJS. Bajo el `import()` de
+ * webpack el namespace que regresa envuelve los exports reales en `.default`,
+ * asi que `RGL.WidthProvider` sale undefined y truena con
+ * "RGL.WidthProvider is not a function". Aceptamos las dos formas: namespace
+ * plano (bundle ESM) y namespace con `.default` (interop CJS).
+ */
+type RGLModule = Pick<
+  typeof import("react-grid-layout"),
+  "WidthProvider" | "Responsive"
+>;
+
 const ResponsiveGridLayout = dynamic(
   async () => {
-    const RGL = await import("react-grid-layout");
+    const mod = await import("react-grid-layout");
+    const RGL: RGLModule =
+      "WidthProvider" in mod
+        ? mod
+        : (mod as unknown as { default: RGLModule }).default;
     return RGL.WidthProvider(RGL.Responsive);
   },
   { ssr: false, loading: () => <CanvasSkeleton /> },
