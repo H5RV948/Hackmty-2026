@@ -1,0 +1,10 @@
+{
+  "name": "banorte-a2ui",
+  "private": true,
+  "packageManager": "pnpm@9.12.0",
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev": "docker compose up",
+    "test": "pnpm --filter @banorte/a2ui test"
+  }
+}

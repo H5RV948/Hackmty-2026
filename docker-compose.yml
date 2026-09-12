@@ -1,0 +1,69 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile.dev
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      # Hot reload confiable en WSL2 / Docker Desktop
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-4-6}
+      MCP_SERVER_URL: ${MCP_SERVER_URL:-http://mcp:8787/mcp}
+    volumes:
+      - ./apps/web:/app/apps/web
+      # Solo las fuentes de los packages, no la carpeta completa: montar
+      # ./packages taparia packages/a2ui/node_modules (los symlinks que crea
+      # pnpm) y `zod` dejaria de resolverse en un clon limpio.
+      - ./packages/a2ui/src:/app/packages/a2ui/src
+      - ./packages/catalog/banorte-catalog.json:/app/packages/catalog/banorte-catalog.json
+      # volumenes anonimos: node_modules y .next viven en el contenedor
+      - /app/node_modules
+      - /app/apps/web/node_modules
+      - /app/apps/web/.next
+    depends_on:
+      - mcp
+    command: pnpm --filter web dev
+
+  mcp:
+    build:
+      context: .
+      dockerfile: apps/mcp/Dockerfile.dev
+    ports:
+      - "8787:8787"
+    environment:
+      NODE_ENV: development
+      PORT: "8787"
+      DATABASE_URL: postgres://banorte:banorte@db:5432/banorte
+    volumes:
+      - ./apps/mcp:/app/apps/mcp
+      - ./packages/a2ui/src:/app/packages/a2ui/src
+      - ./packages/catalog/banorte-catalog.json:/app/packages/catalog/banorte-catalog.json
+      - /app/node_modules
+      - /app/apps/mcp/node_modules
+    depends_on:
+      db:
+        condition: service_healthy
+    command: pnpm --filter mcp dev
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: banorte
+      POSTGRES_PASSWORD: banorte
+      POSTGRES_DB: banorte
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U banorte"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  db_data:

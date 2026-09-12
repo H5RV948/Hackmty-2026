@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Tokens. Nunca hardcodees hex en un componente: si falta un color,
+ * agregalo aqui y en tailwind.config.ts.
+ */
+:root {
+  --ink: #14100f;
+  --surface: #ffffff;
+  --muted: #6b625f;
+  --line: #e6e1df;
+  --brand: #eb0029;
+  --brand-soft: #fdeef1;
+  --positive: #0f7a52;
+  --warning: #b45309;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+body {
+  background: #faf8f8;
+  color: var(--ink);
+  font-family: var(--font-sans);
+}
+
+/* Cifras alineadas: en una pantalla financiera esto importa. */
+.tnum { font-variant-numeric: tabular-nums; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}

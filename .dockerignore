@@ -1,0 +1,20 @@
+# El install lo hace la imagen con pnpm. Si copiamos los node_modules del host,
+# el COPY posterior pisa lo instalado y deja el store de pnpm inconsistente.
+node_modules
+**/node_modules
+
+# Artefactos de build: se regeneran dentro del contenedor.
+.next
+**/.next
+dist
+**/dist
+
+# Secretos: las llaves viajan por environment del compose, nunca dentro de la imagen.
+.env
+.env.*
+!.env.example
+
+.git
+.gitignore
+*.log
+docs

@@ -1,0 +1,155 @@
+/**
+ * Validador de mensajes A2UI contra el catalogo.
+ *
+ * Regla dura (AGENTS.md #2): todo mensaje que sale del backend pasa por aqui.
+ * Si falla, ciclo de reparacion con el error, maximo 2 intentos, luego fallback.
+ */
+import { z } from "zod";
+import catalog from "@banorte/catalog/banorte-catalog.json";
+import { A2UI_VERSION, type A2UIMessage } from "./types.ts";
+
+const CATALOG_COMPONENTS = Object.keys(
+  (catalog as { components: Record<string, unknown> }).components,
+);
+
+const version = z.literal(A2UI_VERSION);
+
+const binding = z.object({ path: z.string().startsWith("/") });
+
+const action = z.object({
+  event: z.object({
+    name: z.string().min(1),
+    payload: z.record(z.unknown()).optional(),
+  }),
+});
+
+const component = z
+  .object({
+    id: z.string().min(1),
+    component: z.enum(CATALOG_COMPONENTS as [string, ...string[]]),
+    children: z.array(z.string()).optional(),
+    action: action.optional(),
+  })
+  .passthrough()
+  .refine(
+    (c) => !("x" in c || "y" in c || "w" in c || "h" in c),
+    {
+      message:
+        "El layout del grid no va dentro de un componente A2UI. Usa updateCanvasLayout.",
+    },
+  );
+
+const gridItem = z.object({
+  surfaceId: z.string().min(1),
+  x: z.number().int().min(0),
+  y: z.number().int().min(0),
+  w: z.number().int().positive(),
+  h: z.number().int().positive(),
+  minW: z.number().int().positive().optional(),
+  minH: z.number().int().positive().optional(),
+});
+
+const messageSchema = z.union([
+  z.object({
+    version,
+    createSurface: z.object({
+      surfaceId: z.string().min(1),
+      catalogId: z.string().min(1),
+      title: z.string().optional(),
+    }),
+  }),
+  z.object({
+    version,
+    updateComponents: z.object({
+      surfaceId: z.string().min(1),
+      components: z.array(component).min(1),
+      root: z.string().optional(),
+    }),
+  }),
+  z.object({
+    version,
+    updateDataModel: z.object({
+      surfaceId: z.string().min(1),
+      path: z.string().startsWith("/"),
+      value: z.unknown(),
+    }),
+  }),
+  z.object({
+    version,
+    deleteSurface: z.object({ surfaceId: z.string().min(1) }),
+  }),
+  z.object({
+    version,
+    updateCanvasLayout: z.object({
+      items: z.array(gridItem),
+      editable: z.boolean().optional(),
+    }),
+  }),
+  z.object({
+    version,
+    updateGuidance: z.object({
+      surfaceId: z.string().optional(),
+      steps: z
+        .array(
+          z.object({
+            targetId: z.string().min(1),
+            title: z.string().min(1),
+            body: z.string().min(1),
+            side: z.enum(["top", "right", "bottom", "left"]).optional(),
+          }),
+        )
+        .min(1),
+      trigger: z.enum(["auto", "manual"]).optional(),
+    }),
+  }),
+]);
+
+export type ValidationResult =
+  | { ok: true; message: A2UIMessage }
+  | { ok: false; errors: string[] };
+
+export function validateA2UI(input: unknown): ValidationResult {
+  const parsed = messageSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      errors: parsed.error.issues.map(
+        (i) => `${i.path.join(".") || "(raiz)"}: ${i.message}`,
+      ),
+    };
+  }
+
+  const message = parsed.data as A2UIMessage;
+
+  // Integridad referencial: children y root deben existir en la misma surface.
+  if ("updateComponents" in message) {
+    const { components, root } = message.updateComponents;
+    const ids = new Set(components.map((c) => c.id));
+    const errors: string[] = [];
+    for (const c of components) {
+      for (const child of c.children ?? []) {
+        if (!ids.has(child)) {
+          errors.push(`${c.id}: el hijo "${child}" no existe en la surface.`);
+        }
+      }
+    }
+    if (root && !ids.has(root)) {
+      errors.push(`root: "${root}" no existe en la surface.`);
+    }
+    if (errors.length > 0) return { ok: false, errors };
+  }
+
+  return { ok: true, message };
+}
+
+/** Prompt-friendly: lista de componentes permitidos para el surface planner. */
+export function catalogSummaryForPrompt(): string {
+  const components = (catalog as {
+    components: Record<string, { description: string; props: Record<string, unknown> }>;
+  }).components;
+  return Object.entries(components)
+    .map(([name, def]) => `- ${name}: ${def.description}\n  props: ${Object.keys(def.props).join(", ")}`)
+    .join("\n");
+}
+
+export const CATALOG_ID = (catalog as { catalogId: string }).catalogId;

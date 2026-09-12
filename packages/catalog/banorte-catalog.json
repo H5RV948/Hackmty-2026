@@ -1,0 +1,125 @@
+{
+  "catalogId": "https://banorte-tec.local/catalogs/banorte/v1/catalog.json",
+  "version": "1.0.0",
+  "description": "Catalogo de componentes del asesor financiero. Fuente de verdad del protocolo: el agente solo puede pedir componentes listados aqui.",
+  "components": {
+    "Text": {
+      "phase": "primitive",
+      "description": "Texto. Usar para titulos, parrafos y notas al pie.",
+      "props": {
+        "text": { "type": "string", "required": true, "bindable": true },
+        "variant": { "type": "enum", "values": ["h1", "h2", "h3", "body", "caption"], "default": "body" }
+      }
+    },
+    "Button": {
+      "phase": "primitive",
+      "description": "Accion. Dispara un evento que regresa al agente.",
+      "props": {
+        "label": { "type": "string", "required": true },
+        "variant": { "type": "enum", "values": ["primary", "secondary", "ghost"], "default": "primary" },
+        "action": { "type": "action", "required": true }
+      }
+    },
+    "Stat": {
+      "phase": "primitive",
+      "description": "Un numero con su etiqueta y una variacion opcional.",
+      "props": {
+        "label": { "type": "string", "required": true },
+        "value": { "type": "string", "required": true, "bindable": true },
+        "delta": { "type": "string", "bindable": true },
+        "tone": { "type": "enum", "values": ["neutral", "positive", "warning", "critical"], "default": "neutral" }
+      }
+    },
+    "FinancialHealthCard": {
+      "phase": "analizar",
+      "description": "Resumen de la situacion financiera: ingreso, gasto, deuda y una lectura en lenguaje claro.",
+      "props": {
+        "titulo": { "type": "string", "required": true },
+        "lectura": { "type": "string", "required": true, "description": "Explicacion en lenguaje simple, sin jerga bancaria." },
+        "metricas": { "type": "array<Stat>", "required": true, "bindable": true }
+      }
+    },
+    "CashflowChart": {
+      "phase": "analizar",
+      "description": "Serie mensual de ingresos contra gastos.",
+      "props": {
+        "titulo": { "type": "string", "required": true },
+        "serie": { "type": "array<{ mes: string, ingreso: number, gasto: number }>", "required": true, "bindable": true }
+      }
+    },
+    "SpendingBreakdown": {
+      "phase": "analizar",
+      "description": "Distribucion del gasto por categoria.",
+      "props": {
+        "titulo": { "type": "string", "required": true },
+        "categorias": { "type": "array<{ nombre: string, monto: number }>", "required": true, "bindable": true }
+      }
+    },
+    "OpportunityGrid": {
+      "phase": "posibilidades",
+      "description": "Posibilidades detectadas por el agente. El usuario selecciona una o varias; la seleccion abre la exploracion adaptativa. NO representa productos contratables, solo caminos posibles.",
+      "props": {
+        "titulo": { "type": "string", "required": true },
+        "opciones": { "type": "array<{ id: string, titulo: string, porQue: string, impactoEstimado: string }>", "required": true, "bindable": true },
+        "seleccionMultiple": { "type": "boolean", "default": true },
+        "action": { "type": "action", "required": true }
+      }
+    },
+    "ExplorationCard": {
+      "phase": "preguntar",
+      "description": "Una sola pregunta progresiva. Nunca un cuestionario. El agente la emite una a la vez y la siguiente depende de la respuesta.",
+      "props": {
+        "pregunta": { "type": "string", "required": true },
+        "porQuePregunto": { "type": "string", "required": true, "description": "Transparencia: por que esta pregunta importa para la recomendacion." },
+        "tipo": { "type": "enum", "values": ["opcion", "escala", "monto", "texto"], "required": true },
+        "opciones": { "type": "array<{ id: string, label: string }>" },
+        "slot": { "type": "string", "required": true, "description": "Slot de UserUnderstanding que esta pregunta busca llenar." },
+        "action": { "type": "action", "required": true }
+      }
+    },
+    "UnderstandingSummary": {
+      "phase": "validar",
+      "description": "Requisito del reto: el agente devuelve lo que entendio y el usuario confirma o corrige antes de avanzar.",
+      "props": {
+        "objetivoEntendido": { "type": "string", "required": true, "bindable": true },
+        "supuestos": { "type": "array<string>", "required": true, "bindable": true },
+        "confianza": { "type": "number", "bindable": true },
+        "action": { "type": "action", "required": true }
+      }
+    },
+    "DebtSimulator": {
+      "phase": "resultado",
+      "description": "Simulador de reestructura. Al mover los controles emite updateDataModel; el recalculo lo hace la tool MCP, no el LLM.",
+      "props": {
+        "saldo": { "type": "number", "required": true, "bindable": true },
+        "plazos": { "type": "array<number>", "required": true },
+        "plazoSeleccionado": { "type": "number", "bindable": true },
+        "cat": { "type": "number", "bindable": true },
+        "pagoMensual": { "type": "number", "bindable": true },
+        "action": { "type": "action", "required": true }
+      }
+    },
+    "OptionComparator": {
+      "phase": "resultado",
+      "description": "Compara alternativas lado a lado con costo total y trade-offs explicitos. Obligatorio mostrar el costo, no solo el beneficio.",
+      "props": {
+        "titulo": { "type": "string", "required": true },
+        "opciones": { "type": "array<{ id: string, nombre: string, pagoMensual: number, costoTotal: number, plazoMeses: number, ventaja: string, desventaja: string }>", "required": true, "bindable": true },
+        "action": { "type": "action", "required": true }
+      }
+    },
+    "ActionPlan": {
+      "phase": "resultado",
+      "description": "Ruta de accion. El paso final dispara una tool MCP de tipo write y exige confirmacion del usuario.",
+      "props": {
+        "titulo": { "type": "string", "required": true },
+        "pasos": { "type": "array<{ titulo: string, detalle: string, requiereConfirmacion: boolean }>", "required": true, "bindable": true },
+        "action": { "type": "action", "required": true }
+      }
+    }
+  },
+  "actions": {
+    "description": "Todo evento emitido por un componente regresa al agente como contexto.",
+    "shape": { "event": { "name": "string", "payload": "object" } }
+  }
+}
