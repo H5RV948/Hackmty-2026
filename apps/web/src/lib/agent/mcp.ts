@@ -167,8 +167,25 @@ export async function precargarContexto(
   const clienteId = leerClienteId(perfil.text);
   if (!clienteId) return [perfil];
 
-  // Si el cliente no trae deuda de tarjeta, la tool falla y no pasa nada: el
-  // modelo tiene el perfil y decide que hacer.
-  const simulacion = await session.call("simulate_restructure", { clienteId });
-  return simulacion.isError ? [perfil] : [perfil, simulacion];
+  /*
+   * La cartera se precarga siempre, junto con el perfil.
+   *
+   * Es una llamada local de milisegundos y responde la pregunta mas comun de
+   * todas —"que productos tengo"— sin gastar un turno del modelo. Cuando no
+   * venia precargada, el razonador resolvia "analiza mi perfil" con cero
+   * llamadas a herramientas y armaba el tablero sin la cartera: la pantalla
+   * hablaba de la tarjeta e ignoraba que la persona tambien tiene un credito
+   * personal y una cuenta de debito.
+   *
+   * Las dos van en paralelo: son independientes y secuenciarlas solo sumaba
+   * latencia a la parte que el usuario si nota.
+   */
+  const [simulacion, productos] = await Promise.all([
+    // Si el cliente no trae deuda de tarjeta, la tool falla y no pasa nada: el
+    // modelo tiene el perfil y decide que hacer.
+    session.call("simulate_restructure", { clienteId }),
+    session.call("get_my_products", { clienteId }),
+  ]);
+
+  return [perfil, simulacion, productos].filter((r) => !r.isError);
 }

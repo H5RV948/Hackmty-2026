@@ -403,6 +403,93 @@
           "required": true
         }
       }
+    },
+    "HeadlineVerdict": {
+      "phase": "analizar",
+      "description": "NIVEL 1 de la pantalla: la conclusion, en grande y sin rodeos. Un dato protagonista, una linea que lo interpreta y, si aplica, una barra que lo situa. Va SIEMPRE arriba de todo. No es un parrafo: si necesitas explicar mas, eso va en los widgets de abajo.",
+      "props": {
+        "veredicto": {
+          "type": "string",
+          "required": true,
+          "bindable": true,
+          "description": "La conclusion en UNA linea, maximo 90 caracteres. Es lo primero que lee el usuario."
+        },
+        "dato": {
+          "type": "string",
+          "required": true,
+          "bindable": true,
+          "description": "La cifra protagonista, ya formateada ($16,525 / 94% / 591). Copiada de una tool."
+        },
+        "datoEtiqueta": {
+          "type": "string",
+          "required": true,
+          "description": "Que es esa cifra, en dos o tres palabras."
+        },
+        "tono": {
+          "type": "enum",
+          "values": [
+            "neutral",
+            "positive",
+            "warning",
+            "critical"
+          ],
+          "default": "neutral"
+        },
+        "indicador": {
+          "type": "{ valor: number, etiqueta: string }",
+          "bindable": true,
+          "description": "Barra de 0 a 100 que situa el dato (uso de linea, score sobre 850, avance). Omitela si la cifra no es un porcentaje ni una posicion en un rango."
+        },
+        "apoyo": {
+          "type": "array<{ label: string, value: string }>",
+          "bindable": true,
+          "description": "De UNO a TRES datos de contexto, cortos. Nunca mas de tres: esto es el titular, no el reporte."
+        }
+      }
+    },
+    "ProductPortfolio": {
+      "phase": "analizar",
+      "description": "NIVEL 2: los productos que el cliente YA tiene, como mosaico visual. Responde 'que productos tengo' de un vistazo. Los datos salen de get_my_products: contratados con su cifra, y los no contratados como etiquetas al pie. Nunca inventes el detalle de un credito: el seed no lo trae y la tool lo dice en su campo `limitacion`.",
+      "props": {
+        "titulo": {
+          "type": "string",
+          "required": true
+        },
+        "productos": {
+          "type": "array<{ id: string, tipo: string, familia: string, valor: string, etiqueta: string, nota: string }>",
+          "required": true,
+          "bindable": true,
+          "description": "Uno por producto CONTRATADO. `familia` es cuenta|tarjeta|credito|inversion y elige el icono. `valor` es la cifra ya formateada, o \"\" si la tool no trae ninguna. `nota` es opcional, una linea corta."
+        },
+        "sinContratar": {
+          "type": "array<string>",
+          "bindable": true,
+          "description": "Nombres de los productos que NO tiene, para que sepa que existe. Van como etiquetas apagadas al pie, sin venderlos."
+        },
+        "action": {
+          "type": "action"
+        }
+      }
+    },
+    "NextSteps": {
+      "phase": "resultado",
+      "description": "NIVEL 3: en que puede seguir el usuario. Dos a cuatro botones que al picarse mandan su texto como una consulta nueva, tal cual. NO es un flujo de contratacion ni un plan de pasos: son caminos para seguir explorando ('Comparar con otras tarjetas', 'Ver que pasa si pago mas al mes'). Cierra con esto en vez de con un parrafo.",
+      "props": {
+        "titulo": {
+          "type": "string"
+        },
+        "pasos": {
+          "type": "array<{ id: string, texto: string }>",
+          "required": true,
+          "bindable": true,
+          "description": "`texto` se manda TAL CUAL como si el usuario lo hubiera escrito: redactalo en primera persona y que sea una consulta que si sepas resolver."
+        },
+        "action": {
+          "type": "action",
+          "required": true,
+          "description": "Siempre { \"event\": { \"name\": \"siguiente_paso\" } }."
+        }
+      }
     }
   },
   "actions": {

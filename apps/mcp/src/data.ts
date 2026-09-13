@@ -119,6 +119,32 @@ export type Cliente = {
   reestructuraPrevia: boolean;
   objetivoFinanciero: string;
   productoInteres: string;
+
+  /*
+   * Cartera de productos.
+   *
+   * Estas columnas ya venian en el CSV desde el principio; lo que faltaba era
+   * mapearlas. Sin ellas el asesor no podia responder "que productos tengo",
+   * que es la primera pregunta que hace cualquiera al entrar a su banca, y
+   * tampoco podia hablar de creditos ni de prestamos: solo veia la tarjeta.
+   *
+   * El seed NO trae el detalle de cada credito (monto, tasa, plazo, mensualidad
+   * de cada uno). Trae si lo tiene o no, cuantos hay activos y la deuda total.
+   * Lo que no esta, no se inventa: la UI dice cuantos son y manda al detalle.
+   */
+  numeroProductosBancarios: number | null;
+  antiguedadClienteAnios: number | null;
+  tieneCuentaDebito: boolean;
+  saldoPromedioCuenta: number | null;
+  tieneCreditoPersonal: boolean;
+  tieneCreditoAutomotriz: boolean;
+  tieneCreditoHipotecario: boolean;
+  tieneCreditoEmpresarial: boolean;
+  tieneInversiones: boolean;
+  creditosActivos: number | null;
+  creditosLiquidados: number | null;
+  nivelAhorro: string;
+  perfilFinanciero: string;
 };
 
 export const clientes: Cliente[] = readSeed("clientes_sintetico_con_nombres.csv").map((r) => ({
@@ -148,6 +174,20 @@ export const clientes: Cliente[] = readSeed("clientes_sintetico_con_nombres.csv"
   reestructuraPrevia: bool(r.reestructuracion_deuda_previa),
   objetivoFinanciero: r.principal_objetivo_financiero,
   productoInteres: r.producto_interes,
+
+  numeroProductosBancarios: num(r.numero_productos_bancarios),
+  antiguedadClienteAnios: num(r.antiguedad_cliente_anios),
+  tieneCuentaDebito: bool(r.tiene_cuenta_debito),
+  saldoPromedioCuenta: num(r.saldo_promedio_cuenta_mxn),
+  tieneCreditoPersonal: bool(r.tiene_credito_personal),
+  tieneCreditoAutomotriz: bool(r.tiene_credito_automotriz),
+  tieneCreditoHipotecario: bool(r.tiene_credito_hipotecario),
+  tieneCreditoEmpresarial: bool(r.tiene_credito_empresarial),
+  tieneInversiones: bool(r.tiene_inversiones),
+  creditosActivos: num(r.creditos_activos),
+  creditosLiquidados: num(r.creditos_liquidados),
+  nivelAhorro: r.nivel_ahorro,
+  perfilFinanciero: r.perfil_financiero,
 }));
 
 /**

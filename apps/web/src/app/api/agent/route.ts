@@ -14,7 +14,11 @@
  */
 import { validateA2UI } from "@banorte/a2ui";
 import type { A2UIMessage, ClientEvent, GridItem } from "@banorte/a2ui";
-import { clasificarConsulta, fueraDeAlcanceMessages } from "@/lib/agent/scope";
+import {
+  SURFACE_FUERA_DE_ALCANCE,
+  clasificarConsulta,
+  fueraDeAlcanceMessages,
+} from "@/lib/agent/scope";
 import { openMcpSession, precargarContexto } from "@/lib/agent/mcp";
 import { reason } from "@/lib/agent/gemini";
 import { fallbackSurface, planSurfaces } from "@/lib/agent/planner";
@@ -99,7 +103,9 @@ export async function POST(request: Request) {
        * filtrarlo esconderia el bug en vez de arreglarlo.
        */
       if (event.type === "user_message" && !event.forzado) {
-        const alcance = clasificarConsulta(event.text);
+        // Con tablero en pantalla el filtro afloja: ver clasificarConsulta.
+        const hayTablero = surfaces.some((id) => id !== SURFACE_FUERA_DE_ALCANCE);
+        const alcance = clasificarConsulta(event.text, hayTablero);
         if (!alcance.dentro) {
           console.info(`[scope] consulta fuera de alcance (${alcance.motivo}): "${event.text}"`);
           for (const message of fueraDeAlcanceMessages(alcance.motivo, event.text, layout)) {
@@ -120,9 +126,27 @@ export async function POST(request: Request) {
          */
         const t0 = Date.now();
         mcp = await openMcpSession();
-        // `nuevoCaso` solo en consultas nuevas desde la barra: al reaccionar a
-        // un boton seguimos hablando con la misma persona.
-        const precargados = await precargarContexto(mcp, event.type === "user_message");
+
+        /*
+         * `nuevoCaso` rota a otro cliente sintetico. Solo puede pasar en la
+         * PRIMERA consulta de la sesion, cuando el canvas todavia esta vacio.
+         *
+         * Antes se mandaba en cada consulta escrita, y el efecto era absurdo:
+         * el usuario preguntaba "analiza mi perfil", le contestabamos "Gabriela,
+         * tu saldo es...", pedia mas detalle y en la siguiente pantalla ya era
+         * Fernando con otras cifras. Una misma sesion tiene una sola persona;
+         * seguir preguntando no te convierte en alguien mas.
+         *
+         * La tarjeta de fuera de alcance no cuenta como pantalla: si la unica
+         * surface es esa, el usuario todavia no ha empezado y su primera
+         * consulta de verdad si puede estrenar cliente.
+         */
+        const soloFueraDeAlcance =
+          surfaces.length === 0 ||
+          (surfaces.length === 1 && surfaces[0] === SURFACE_FUERA_DE_ALCANCE);
+        const empiezaSesion = event.type === "user_message" && soloFueraDeAlcance;
+
+        const precargados = await precargarContexto(mcp, empiezaSesion);
         const tMcp = Date.now();
         const reasoning = await reason(intent, mcp, precargados);
         const tRazon = Date.now();

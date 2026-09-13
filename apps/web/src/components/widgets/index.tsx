@@ -492,83 +492,121 @@ export function CardShowcase({ titulo, tarjetas, destacadaId, emit, action }: Wi
   const name =
     (action as { event?: { name?: string } } | undefined)?.event?.name ?? "card_selected";
 
+  /*
+   * El detalle vive en un panel DEBAJO de la reja, no encima del plastico.
+   *
+   * Antes era una capa `absolute inset-0` que aparecia al pasar el cursor y
+   * tapaba la tarjeta entera. Tres problemas: tapaba justo la imagen que el
+   * usuario estaba mirando, obligaba a sostener el cursor para leer, y en una
+   * pantalla tactil no hay "pasar el cursor" — o salia siempre puesta o no
+   * salia nunca.
+   *
+   * Con el panel abajo, la reja no se mueve al elegir, el detalle siempre
+   * aparece en el mismo sitio (el ojo ya sabe donde mirar) y funciona igual con
+   * dedo que con raton. El canvas mide su alto solo, asi que la tarjeta del
+   * tablero crece lo justo cuando el panel se abre.
+   */
+  const inicial = lista.find((t) => t.id === destacadaId)?.id ?? lista[0]?.id ?? null;
+  const [abierta, setAbierta] = useState<string | null>(null);
+
+  const detalle = lista.find((t) => t.id === (abierta ?? inicial)) ?? null;
+
   return (
     <section>
       <h3 className="text-base font-semibold text-ink">{String(titulo ?? "")}</h3>
 
-      <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-3">
         {lista.map((t) => {
           // La destacada la elige la tool (recomendada:true), no el modelo.
           const destacada = destacadaId !== undefined && t.id === destacadaId;
+          const seleccionada = detalle?.id === t.id;
           return (
-          <article
-            key={t.id}
-            className={`group relative overflow-hidden rounded-xl border bg-surface p-4 ${
-              destacada ? "border-brand ring-2 ring-brand/30" : "border-line"
-            }`}
-          >
-            {destacada && (
-              <span className="absolute left-0 top-0 z-10 rounded-br-lg bg-brand px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
-                La que mas te conviene
-              </span>
-            )}
-            <img
-              src={t.imagen}
-              alt={t.nombre}
-              loading="lazy"
-              className="mx-auto h-28 w-auto object-contain transition-transform duration-200 group-hover:scale-[1.03]"
-            />
+            <button
+              key={t.id}
+              type="button"
+              aria-pressed={seleccionada}
+              onClick={() => setAbierta(t.id)}
+              className={`relative overflow-hidden rounded-xl border bg-surface p-3 text-left transition-colors ${
+                seleccionada
+                  ? "border-brand ring-2 ring-brand/30"
+                  : destacada
+                    ? "border-brand/50 hover:border-brand"
+                    : "border-line hover:border-brand"
+              }`}
+            >
+              {destacada && (
+                <span className="absolute left-0 top-0 z-10 rounded-br-lg bg-brand px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
+                  Te conviene
+                </span>
+              )}
 
-            <p className="mt-3 text-center text-sm font-semibold text-ink">{t.nombre}</p>
+              <img
+                src={t.imagen}
+                alt={t.nombre}
+                loading="lazy"
+                className="mx-auto h-24 w-auto object-contain"
+              />
 
-            {typeof t.cat === "number" && (
-              <p className="mt-1 text-center text-xs text-muted">
-                CAT promedio <span className="tnum font-medium text-ink">{t.cat}%</span>
-                {typeof t.anualidad === "number" && (
-                  <> · anualidad <span className="tnum font-medium text-ink">{money(t.anualidad)}</span></>
-                )}
+              <p className="mt-2 text-center text-xs font-semibold leading-tight text-ink">
+                {t.nombre}
               </p>
-            )}
 
-            <div className="pointer-events-none absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-surface via-surface/95 to-transparent p-4 opacity-0 transition-opacity duration-200 group-hover:pointer-events-auto group-hover:opacity-100 max-lg:pointer-events-auto max-lg:static max-lg:bg-none max-lg:p-0 max-lg:pt-3 max-lg:opacity-100">
-              <ul className="space-y-1">
-                {(t.bullets ?? []).map((b) => (
-                  <li key={b} className="flex gap-2 text-xs leading-relaxed text-muted">
-                    <span aria-hidden className="mt-[6px] h-1 w-1 shrink-0 rounded-full bg-brand" />
-                    {b}
-                  </li>
-                ))}
-              </ul>
-
-              <button
-                type="button"
-                onClick={() => emit(name, { cardId: t.id, nombre: t.nombre })}
-                className="mt-3 self-start rounded-md bg-brand px-4 py-2 text-xs font-semibold text-white"
-              >
-                Ver mas
-              </button>
-
-              {t.fuente && (
-                <p className="mt-2 text-[10px] leading-tight text-muted">
-                  Fuente oficial{t.fechaVerificacion ? ` · vigente al ${t.fechaVerificacion}` : ""}
+              {typeof t.anualidad === "number" && (
+                <p className="tnum mt-0.5 text-center text-[11px] text-muted">
+                  {t.anualidad === 0 ? "Sin anualidad" : `Anualidad ${money(t.anualidad)}`}
                 </p>
               )}
-            </div>
-          </article>
+            </button>
           );
         })}
       </div>
+
+      {detalle && (
+        <div className="mt-4 rounded-xl border border-line bg-brand-soft/40 p-4">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <p className="text-sm font-semibold text-ink">{detalle.nombre}</p>
+            <p className="tnum text-xs text-muted">
+              {typeof detalle.cat === "number" && (
+                <>CAT promedio <span className="font-medium text-ink">{detalle.cat}%</span></>
+              )}
+              {typeof detalle.anualidad === "number" && (
+                <> · anualidad <span className="font-medium text-ink">{money(detalle.anualidad)}</span></>
+              )}
+            </p>
+          </div>
+
+          {(detalle.bullets ?? []).length > 0 && (
+            <ul className="mt-3 grid gap-1 sm:grid-cols-2">
+              {(detalle.bullets ?? []).map((b) => (
+                <li key={b} className="flex gap-2 text-xs leading-relaxed text-muted">
+                  <span aria-hidden className="mt-[6px] h-1 w-1 shrink-0 rounded-full bg-brand" />
+                  {b}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => emit(name, { cardId: detalle.id, nombre: detalle.nombre })}
+              className="rounded-full bg-brand px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+            >
+              Analizar esta tarjeta para mi
+            </button>
+            {detalle.fuente && (
+              <p className="text-[10px] leading-tight text-muted">
+                Fuente oficial
+                {detalle.fechaVerificacion ? ` · vigente al ${detalle.fechaVerificacion}` : ""}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
     </section>
   );
 }
 
-/**
- * Ranking en barras horizontales.
- *
- * Barras y no dona ni radar: la pregunta es "cual me conviene mas", que es una
- * comparacion de magnitudes en una sola dimension, y para eso la longitud es la
- * codificacion que el ojo compara mejor.
- */
 export function CardRanking({ titulo, criterio, barras, destacadaId }: WidgetProps) {
   const lista = Array.isArray(barras)
     ? (barras as { id: string; nombre: string; puntaje: number; porQue?: string }[])
@@ -797,6 +835,206 @@ export function OutOfScopeCard({
           </button>
         </div>
       )}
+    </section>
+  );
+}
+
+/* ---------------------------------------------------------------- */
+/* Jerarquia visual del tablero: titular -> cartera -> siguiente paso */
+/* ---------------------------------------------------------------- */
+
+/**
+ * NIVEL 1: la conclusion, en grande.
+ *
+ * Regla de producto que este widget existe para forzar: primero mostrar,
+ * despues explicar. Antes el tablero abria con un parrafo de cuatro renglones
+ * y la cifra importante aparecia a media tarjeta; el usuario tenia que LEER
+ * para enterarse de algo que se entiende en un segundo si se pone grande.
+ *
+ * Por eso `veredicto` es una linea y no un campo de texto libre: si cupiera un
+ * parrafo, acabaria habiendo un parrafo.
+ */
+export function HeadlineVerdict({ veredicto, dato, datoEtiqueta, tono = "neutral", indicador, apoyo }: WidgetProps) {
+  const tonos: Record<string, { texto: string; barra: string; halo: string }> = {
+    neutral: { texto: "text-ink", barra: "bg-ink", halo: "bg-line/60" },
+    positive: { texto: "text-positive", barra: "bg-positive", halo: "bg-positive/10" },
+    warning: { texto: "text-warning", barra: "bg-warning", halo: "bg-warning/10" },
+    critical: { texto: "text-brand", barra: "bg-brand", halo: "bg-brand-soft" },
+  };
+  const t = tonos[String(tono)] ?? tonos.neutral;
+
+  const medida = indicador as { valor?: number; etiqueta?: string } | undefined;
+  const valor = typeof medida?.valor === "number" ? Math.max(0, Math.min(100, medida.valor)) : null;
+  const contexto = Array.isArray(apoyo) ? (apoyo as { label: string; value: string }[]).slice(0, 3) : [];
+
+  return (
+    <section className="space-y-5">
+      {/*
+        gap y no justify-between: con la tarjeta a todo lo ancho, empujar el
+        veredicto a la orilla derecha lo despegaba de su cifra y los dos se
+        leian como dos cosas distintas. Juntos se leen como una sola frase.
+      */}
+      <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
+        <div className="min-w-0">
+          <p className="text-xs uppercase tracking-wide text-muted">{String(datoEtiqueta ?? "")}</p>
+          {/* La cifra manda: es lo unico a 48px de la pantalla. */}
+          <p className={`tnum mt-1 text-5xl font-bold leading-none ${t.texto}`}>{String(dato ?? "")}</p>
+        </div>
+        <p className="max-w-[46ch] text-base font-medium leading-snug text-ink">
+          {String(veredicto ?? "")}
+        </p>
+      </div>
+
+      {valor !== null && (
+        <div className="space-y-1.5">
+          <div className={`h-2.5 w-full overflow-hidden rounded-full ${t.halo}`}>
+            <div className={`h-full rounded-full ${t.barra}`} style={{ width: `${valor}%` }} />
+          </div>
+          {medida?.etiqueta && <p className="text-xs text-muted">{medida.etiqueta}</p>}
+        </div>
+      )}
+
+      {contexto.length > 0 && (
+        <div className="flex flex-wrap gap-x-10 gap-y-3 border-t border-line pt-4">
+          {contexto.map((c) => (
+            <div key={c.label}>
+              <p className="text-xs text-muted">{c.label}</p>
+              <p className="tnum text-lg font-semibold text-ink">{c.value}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** Iconos de la cartera. Cuatro familias, cuatro trazos simples. */
+function IconoProducto({ familia }: { familia: string }) {
+  const trazos: Record<string, ReactNode> = {
+    cuenta: <path d="M3 8h18M3 8l9-4 9 4M5 8v9m14-9v9M3 17h18" strokeLinecap="round" strokeLinejoin="round" />,
+    tarjeta: <><rect x="2.5" y="5.5" width="19" height="13" rx="2.5" /><path d="M2.5 10h19" /></>,
+    credito: <><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5v9M9.5 10h4a1.8 1.8 0 0 1 0 3.6h-3a1.8 1.8 0 0 0 0 3.6h4" strokeLinecap="round" /></>,
+    inversion: <path d="M4 17l5-5 3.5 3.5L20 8m0 0h-4.5M20 8v4.5" strokeLinecap="round" strokeLinejoin="round" />,
+  };
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8">
+      {trazos[familia] ?? trazos.cuenta}
+    </svg>
+  );
+}
+
+type Producto = { id: string; tipo: string; familia: string; valor?: string; etiqueta?: string; nota?: string };
+
+/**
+ * NIVEL 2: que tiene contratado, de un vistazo.
+ *
+ * Mosaico y no lista: "que productos tengo" es una pregunta de panorama, y un
+ * panorama se escanea, no se lee renglon por renglon.
+ *
+ * Los productos que NO tiene van abajo, apagados y sin cifra. Estan porque el
+ * usuario tiene derecho a saber que existen, y NO como anzuelo: sin boton de
+ * contratar, sin "te recomendamos", sin color de marca. Es informacion, no
+ * venta (AGENTS.md, regla 7).
+ */
+export function ProductPortfolio({ titulo, productos, sinContratar, emit, action }: WidgetProps) {
+  const items = Array.isArray(productos) ? (productos as Producto[]) : [];
+  const faltantes = Array.isArray(sinContratar) ? (sinContratar as string[]) : [];
+  const name = (action as { event?: { name?: string } } | undefined)?.event?.name;
+
+  return (
+    <section className="space-y-4">
+      <h2 className="text-lg font-semibold">{String(titulo ?? "")}</h2>
+
+      <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {items.map((p) => {
+          const Contenedor = name ? "button" : "div";
+          return (
+            <li key={p.id}>
+              <Contenedor
+                {...(name
+                  ? { type: "button" as const, onClick: () => emit(name, { productoId: p.id, tipo: p.tipo }) }
+                  : {})}
+                className={`h-full w-full rounded-xl border border-line bg-surface p-4 text-left ${
+                  name ? "transition-colors hover:border-brand hover:bg-brand-soft" : ""
+                }`}
+              >
+                <div className="flex items-center gap-2 text-muted">
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-brand-soft text-brand">
+                    <IconoProducto familia={String(p.familia)} />
+                  </span>
+                  <span className="text-sm font-medium text-ink">{p.tipo}</span>
+                </div>
+
+                {p.valor ? (
+                  <>
+                    <p className="tnum mt-3 text-2xl font-semibold text-ink">{p.valor}</p>
+                    <p className="text-xs text-muted">{p.etiqueta ?? ""}</p>
+                  </>
+                ) : (
+                  <p className="mt-3 text-xs text-muted">Activo</p>
+                )}
+
+                {p.nota && <p className="mt-2 text-xs leading-relaxed text-muted">{p.nota}</p>}
+              </Contenedor>
+            </li>
+          );
+        })}
+      </ul>
+
+      {faltantes.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
+          <span className="text-xs text-muted">No tienes:</span>
+          {faltantes.map((f) => (
+            <span key={f} className="rounded-full border border-dashed border-line px-3 py-1 text-xs text-muted">
+              {f}
+            </span>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/**
+ * NIVEL 3: por donde seguir.
+ *
+ * Cada boton manda su propio texto como una consulta nueva —el mismo camino que
+ * usa la tarjeta de fuera de alcance—, asi que el historial de la sesion
+ * muestra una pregunta legible y no "paso 2".
+ *
+ * Sustituye a ActionPlan, que esta prohibido: la diferencia es que aqui no hay
+ * nada que confirmar ni que contratar. Son preguntas, no compromisos.
+ */
+export function NextSteps({ titulo, pasos, emit, action }: WidgetProps) {
+  const items = Array.isArray(pasos) ? (pasos as { id: string; texto: string }[]) : [];
+  const name = (action as { event?: { name?: string } } | undefined)?.event?.name ?? "siguiente_paso";
+
+  return (
+    <section className="space-y-3">
+      <h2 className="text-sm font-semibold text-muted">{String(titulo ?? "Y ahora, que sigue")}</h2>
+      <div className="flex flex-wrap gap-2">
+        {items.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => emit(name, { texto: p.texto, pasoId: p.id })}
+            className="group inline-flex items-center gap-2 rounded-full border border-line px-4 py-2 text-sm transition-colors hover:border-brand hover:bg-brand-soft"
+          >
+            {p.texto}
+            <svg
+              viewBox="0 0 24 24"
+              width="14"
+              height="14"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              className="text-muted transition-colors group-hover:text-brand"
+            >
+              <path d="M5 12h13M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        ))}
+      </div>
     </section>
   );
 }

@@ -49,23 +49,20 @@ Reglas duras:
   componente que quieres no existe, usa uno que si exista. Prohibido inventar.
 - El grid es de 12 columnas y cada unidad de alto son 72px.
 
-ALTURAS (importante: sobra espacio blanco cuando te pasas):
-  Text, Stat                     -> h: 2
-  ExplorationCard                -> h: 3
-  FinancialHealthCard            -> h: 3
-  UnderstandingSummary           -> h: 3
-  OutOfScopeCard                 -> h: 4
-  DebtSimulator                  -> h: 4
-  OpportunityGrid con 2 opciones -> h: 4
-  OptionComparator con 2-3       -> h: 4
-  Ajusta +1 solo si el texto es largo de verdad. Nunca pongas h mayor a 5.
+GEOMETRIA — YA NO LA DECIDES TU, ASI QUE NO LE INVIERTAS:
+  El canvas acomoda solo. El ancho lo fija el tipo de componente y el alto se
+  MIDE del contenido ya dibujado, asi que tus x, y, w y h se ignoran al pintar.
+  Antes los elegias tu y no podia salir bien: tenias que adivinar cuanto mide
+  de alto un texto que nunca viste, y cuando te pasabas quedaba un hueco blanco
+  debajo de la tarjeta.
+  Manda updateCanvasLayout de todos modos —es parte del protocolo— con UNA
+  entrada por surface existente y valores razonables (w: 12 fila completa,
+  w: 6 media, h: 4). Sirve como respaldo, no como disenio.
 
-LAYOUT — una sola regla, pero se rompe seguido:
-  updateCanvasLayout reemplaza el layout COMPLETO. Incluye SIEMPRE todas las
-  surfaces que existan, no solo las nuevas, o las viejas se descolocan y el
-  canvas queda escalonado.
-  Usa w: 6 para dos widgets lado a lado (x: 0 y x: 6 con el mismo y), o w: 12
-  para uno que ocupe el ancho.
+  Lo que SI decides, y es lo que cambia la pantalla: QUE widgets emites y en
+  QUE ORDEN los creas. El orden de creacion es el orden de lectura, de arriba
+  hacia abajo. Lo mas importante primero.
+
 - Un prop "bindable" acepta un literal o un binding { "path": "/ruta" }. Si usas
   binding, manda tambien el updateDataModel con esa ruta.
 - targetId de updateGuidance es el id de un componente que ya emitiste.
@@ -109,6 +106,22 @@ formato y sin simbolo de peso; el formato lo pone la UI):
   y ademas "destacadaId": "<id de la que trae recomendada:true>"
 - CardRanking.barras:           [{ "id": "...", "nombre": "Clásica", "puntaje": 82, "porQue": "Sin anualidad el primer anio y CAT de 121.4%." }]
   y ademas "destacadaId": el mismo id que en CardShowcase
+- HeadlineVerdict:              "veredicto" y "dato" y "datoEtiqueta" son TEXTO.
+  "indicador" es { "valor": NUMERO de 0 a 100, "etiqueta": "..." } y se omite si
+  la cifra no es un porcentaje. "apoyo" es [{ "label": "...", "value": "..." }]
+  con UNO a TRES elementos, nunca mas.
+- ProductPortfolio.productos:   [{ "id": "tarjeta", "tipo": "Tarjeta de credito",
+  "familia": "tarjeta", "valor": "$16,525", "etiqueta": "Saldo actual", "nota": "..." }]
+  Las claves son EXACTAMENTE esas. No uses "label", "value" ni "delta": la
+  tarjeta se dibuja vacia. "familia" es cuenta|tarjeta|credito|inversion y elige
+  el icono. "valor" ya formateado, o "" si la tool no trae cifra para ese
+  producto (el credito personal no la trae: no te la inventes).
+  Y ademas "sinContratar": ["Credito automotriz", ...] con los que NO tiene.
+- NextSteps.pasos:              [{ "id": "a", "texto": "Comparar mi tarjeta con las demas" }]
+  Las claves son "id" y "texto", nada mas. No uses "titulo" ni "detalle": el
+  boton sale en blanco. "texto" se manda TAL CUAL como consulta nueva, asi que
+  va en primera persona y tiene que ser algo que TU sepas resolver: tarjetas,
+  creditos o prestamos. Nunca propongas inversiones, seguros ni tramites.
 - RiskAlert:                    "nivel" es "ok" | "precaucion" | "alto", "titulo"
   y "mensaje" son texto, "senales" es un arreglo de textos. Los cuatro se copian
   de alertaDeuda tal cual: es una evaluacion del banco, no tu opinion.
@@ -125,6 +138,40 @@ Reglas de producto:
   Nunca "te recomendamos contratar X" sin alternativas y sin costos.
 - Los datos son sinteticos y de ejemplo.
 - ExplorationCard va de una pregunta a la vez, nunca un cuestionario.
+- El dominio son TRES cosas: tarjetas de credito, creditos y prestamos.
+
+PRIMERO MOSTRAR, DESPUES EXPLICAR — la regla que mas se rompe:
+  Esto es una pantalla de banca, no un reporte. El usuario tiene que entender lo
+  importante en SEGUNDOS, mirando, sin leer.
+
+  Prohibido:
+  - Parrafos. Ningun texto tuyo pasa de DOS renglones (unos 160 caracteres).
+  - Abrir la pantalla con una explicacion. Se abre con el dato.
+  - Un Text suelto como widget principal. Un Text solo sirve de nota al pie.
+  - Repetir en texto una cifra que ya se ve en un widget.
+  - Mas de CINCO surfaces en una pantalla. Si no cabe en cinco, sobra algo.
+
+  Obligatorio, en este orden — es el orden en que creas las surfaces:
+
+  NIVEL 1, siempre la primera: HeadlineVerdict.
+    La conclusion en una linea + la cifra protagonista + (si aplica) su barra.
+    Ejemplo: veredicto "Tu tarjeta se lleva casi toda tu linea disponible",
+    dato "$16,525", datoEtiqueta "Saldo de tu tarjeta", tono "critical",
+    indicador { valor: 94, etiqueta: "94% de tu limite de $17,500 usado" },
+    apoyo con UNO a TRES datos mas.
+    Cuando la pantalla lleva RiskAlert, van LOS DOS y en este orden: RiskAlert
+    primero, HeadlineVerdict inmediatamente despues. No es uno o el otro —
+    la alerta dice como esta parado, el titular dice que hacer al respecto.
+
+  NIVEL 2, lo que explica esa conclusion, en widgets VISUALES:
+    ProductPortfolio, CardRanking, CardShowcase, OptionComparator,
+    DebtSimulator, FinancialHealthCard. Dos o tres, no seis.
+
+  NIVEL 3, siempre la ultima: NextSteps.
+    De DOS a CUATRO caminos para seguir, redactados en primera persona porque se
+    mandan tal cual como consulta nueva ("Comparar esta tarjeta con las demas",
+    "Ver cuanto bajo mi deuda si pago $1,000 mas al mes").
+    Cierra SIEMPRE con esto. Nunca cierres con un parrafo.
 
 CUANDO NO TENGAS CLARO QUE QUIERE — PREGUNTA, NO ADIVINES:
   Si la consulta es ambigua, o caben dos lecturas que llevarian a pantallas
@@ -145,7 +192,7 @@ CUANDO NO TENGAS CLARO QUE QUIERE — PREGUNTA, NO ADIVINES:
     "action":         { "event": { "name": "clarificar" } }
 
   Ese turno NO lleva nada mas: ni tablero, ni guidance, ni otras surfaces. Solo
-  la pregunta y su updateCanvasLayout con w: 12, h: 3. En el siguiente turno ya
+  la pregunta y su updateCanvasLayout. En el siguiente turno ya
   llega la respuesta del usuario y ahi si armas la pantalla completa.
 
   Un ejemplo de cuando SI aplica: "ayudame con mis finanzas" (¿deuda? ¿ahorro?
@@ -175,11 +222,37 @@ CUANDO LA CONSULTA NO SEA DE ESTE DOMINIO — OutOfScopeCard, Y NADA MAS:
     "consultaOriginal":  lo que escribio, tal cual. La UI le pone con eso el
                          boton de "preguntarlo de todos modos".
     "action":            { "event": { "name": "sugerencia_elegida" } }
-  Layout: w: 12, h: 4. Nada mas en ese turno: ni tablero, ni guidance.
+  Nada mas en ese turno: ni tablero, ni guidance.
 
   No lo uses para desambiguar. Si entiendes que quiere pero no cual de dos
   lecturas, eso es ExplorationCard (arriba). OutOfScopeCard es "esto no lo
   hago", no "no te entendi".
+
+RECETAS POR INTENCION — que tablero arma cada pregunta:
+
+  "Analiza mi perfil" / "que productos tengo" / "conocer mis creditos":
+    1. HeadlineVerdict — la lectura de su situacion en una linea, con la cifra
+       que mas pesa (su deuda total, o su score, o su capacidad de ahorro).
+    2. ProductPortfolio — la cartera de get_my_products: "productos" son los
+       contratados (copia tipo, familia, y formatea "cifra" con su etiqueta) y
+       "sinContratar" son los que no tiene. El detalle por credito NO existe:
+       no lo inventes, la tool te lo advierte en "limitacion".
+    3. Un widget mas SOLO si aporta: DebtSimulator si trae saldo de tarjeta,
+       o FinancialHealthCard si el ingreso y el gasto cuentan algo.
+    4. NextSteps.
+
+  "Que tarjeta me conviene" / "comparar tarjetas":
+    El bloque de get_eligible_cards de abajo, con HeadlineVerdict arriba
+    (cual gana y por que, en una linea) y NextSteps al final.
+
+  "Que credito me conviene" / "revisar mis prestamos":
+    1. HeadlineVerdict con su capacidad real (ingreso menos gastos, o su
+       capacidad de ahorro mensual: son cifras de la tool).
+    2. ProductPortfolio con lo que ya tiene, para que vea contra que compara.
+    3. OptionComparator si hay alternativas con cifras de tool que comparar.
+    4. NextSteps.
+    Si no hay datos para comparar creditos concretos, DILO en el veredicto y
+    ofrece lo que si puedes: no armes un comparador con numeros inventados.
 
 CUANDO EL USUARIO PREGUNTE POR TARJETAS — USA get_eligible_cards:
   Esa tool ya hizo el trabajo dificil: recibe el clienteId y devuelve las
@@ -190,8 +263,9 @@ CUANDO EL USUARIO PREGUNTE POR TARJETAS — USA get_eligible_cards:
 
   Emite estas surfaces, en este orden:
 
-  1. RiskAlert — SIEMPRE, y va primero en el layout (y: 0, w: 12, h: 2; con
-     muchas senales, h: 3). Copia nivel, titulo, mensaje y senales TAL CUAL de
+  1. RiskAlert — SIEMPRE, y es la PRIMERA surface que creas: el orden de
+     creacion es el orden en que se lee la pantalla. Copia nivel, titulo,
+     mensaje y senales TAL CUAL de
      alertaDeuda. No suavices el texto ni le quites senales.
 
   2. CardRanking con las TRES a CINCO mejores de "elegibles", en el orden en
@@ -204,7 +278,6 @@ CUANDO EL USUARIO PREGUNTE POR TARJETAS — USA get_eligible_cards:
      a que puede acceder. Mismo "destacadaId". nombre, imagen, bullets, cat,
      anualidad, fuente y fechaVerificacion se copian TAL CUAL. La imagen nunca
      te la inventes: si la tool no trae ruta, omite esa tarjeta.
-     Layout: w: 12 y h: 5 (son varias filas de plasticos).
 
   4. Si "noElegibles" no viene vacio, un Text (variant "caption") que diga en
      una linea cuantas quedaron fuera y por que — casi siempre es el ingreso
@@ -229,8 +302,30 @@ CUANDO EL USUARIO PREGUNTE POR TARJETAS — USA get_eligible_cards:
 
 NO USES ActionPlan. El producto es un tablero que explica la situacion y sus
 opciones con su costo, no un flujo de contratacion. Nada de "pasos sugeridos"
-ni botones de confirmar un plan. Si quieres cerrar, cierra con datos y con las
-alternativas a la vista, no con una llamada a la accion.
+ni botones de confirmar un plan.
+Para cerrar usa NextSteps, que es otra cosa: no compromete a nada, solo ofrece
+la siguiente pregunta. Un boton que dice "Comparar con otras tarjetas" abre una
+pantalla; uno que dice "Contratar" abre un contrato. Solo el primero es tuyo.
+
+REVISA ESTA LISTA ANTES DE RESPONDER. Cada punto que falle te cuesta un
+reintento completo, y a los tres la pantalla sale incompleta:
+
+  [ ] Toda surface tiene su createSurface, su updateComponents y su entrada en
+      updateCanvasLayout.
+  [ ] "root" es el id de un componente de ESE mismo mensaje.
+  [ ] Toda "action" va envuelta en "event".
+  [ ] Cada componente trae sus props OBLIGATORIAS. Se olvida "titulo" todo el
+      tiempo: CardRanking, CardShowcase, ProductPortfolio, OptionComparator y
+      FinancialHealthCard lo exigen, y sin el se rechaza el mensaje entero.
+  [ ] Los arreglos usan las claves exactas de la lista de arriba, no las de
+      otro widget parecido.
+  [ ] La primera surface es HeadlineVerdict — o RiskAlert y luego
+      HeadlineVerdict, si hay alerta. Las DOS, no una.
+  [ ] Si hablas de tarjetas: RiskAlert + CardRanking + CardShowcase. Las tres.
+  [ ] La ultima surface es NextSteps, y ninguno de sus pasos propone algo fuera
+      de tarjetas, creditos o prestamos.
+  [ ] Ningun texto tuyo pasa de dos renglones.
+  [ ] Cinco surfaces como maximo.
 
 Catalogo de componentes permitidos:
 `;
@@ -475,6 +570,123 @@ function revisarReglas(messages: A2UIMessage[], intent: string): string[] {
       "Emitiste CardShowcase sin CardRanking. Falta la grafica de barras que ordena las tres por conveniencia para este cliente.",
     );
   }
+  /*
+   * Jerarquia visual, verificada y no solo pedida.
+   *
+   * "Primero mostrar, despues explicar" es la regla que el modelo mas rompe:
+   * cumple en la mitad de los turnos y en la otra mitad abre con un parrafo. Y
+   * "casi siempre" no sirve cuando el jurado ve la pantalla una vez.
+   *
+   * Solo aplica a tableros de verdad (dos surfaces o mas). Un turno de una sola
+   * surface es una pregunta de desambiguacion o la tarjeta de fuera de alcance,
+   * y esos no llevan titular ni cierre.
+   */
+  const surfacesCreadas = messages.filter((m) => "createSurface" in m).length;
+  const esTablero = surfacesCreadas >= 2 && !usados.has("OutOfScopeCard") && !usados.has("ExplorationCard");
+
+  if (esTablero && !usados.has("HeadlineVerdict")) {
+    errores.push(
+      "El tablero no abre con HeadlineVerdict. La pantalla tiene que empezar por la conclusion y la cifra que mas pesa, no por una explicacion: agrega una surface con HeadlineVerdict como PRIMERA (o segunda, si hay RiskAlert) y pon ahi el veredicto en una linea, el dato protagonista y su indicador.",
+    );
+  }
+  if (esTablero && !usados.has("NextSteps")) {
+    errores.push(
+      "El tablero no cierra con NextSteps. Agrega una ultima surface con NextSteps y de dos a cuatro caminos redactados en primera persona: sin eso el usuario llega al final de la pantalla y no sabe que mas puede preguntar.",
+    );
+  }
+
+  /*
+   * Cazador de parrafos.
+   *
+   * El limite es por campo y no por pantalla porque el problema nunca fue el
+   * total: era un solo bloque de cuatro renglones al principio que obligaba a
+   * leer antes de ver. 220 caracteres son dos renglones holgados.
+   */
+  const LIMITE = 220;
+  const CAMPOS_DE_TEXTO = ["text", "lectura", "mensaje", "veredicto", "porQue", "criterio"];
+  for (const m of messages) {
+    if (!("updateComponents" in m)) continue;
+    for (const c of m.updateComponents.components) {
+      for (const campo of CAMPOS_DE_TEXTO) {
+        const valor = c[campo];
+        if (typeof valor === "string" && valor.length > LIMITE) {
+          errores.push(
+            `"${campo}" de ${c.id} (${c.component}) tiene ${valor.length} caracteres y el maximo son ${LIMITE}. Es un parrafo, y esta pantalla se mira, no se lee: cortalo a una o dos lineas y deja que el dato hable. Si de verdad hace falta lo que dice, va como cifra en un widget, no como texto.`,
+          );
+        }
+      }
+    }
+  }
+
+  /*
+   * Forma de las props de arreglo.
+   *
+   * El validador del protocolo deja pasar cualquier prop —son abiertas por
+   * diseño— asi que un arreglo con las claves equivocadas es un mensaje
+   * perfectamente valido que dibuja una tarjeta EN BLANCO. Es el peor tipo de
+   * fallo: no hay error en ningun log, solo una pantalla a medias.
+   *
+   * Pasa de verdad y es predecible: el modelo arrastra las claves del widget
+   * mas parecido que ya conoce. A ProductPortfolio le mandaba el {label, value}
+   * de Stat, y a NextSteps el {titulo, detalle} de ActionPlan.
+   */
+  const FORMAS: Record<string, { prop: string; claves: string[] }> = {
+    ProductPortfolio: { prop: "productos", claves: ["id", "tipo", "familia"] },
+    NextSteps: { prop: "pasos", claves: ["id", "texto"] },
+    CardRanking: { prop: "barras", claves: ["id", "nombre", "puntaje"] },
+    CardShowcase: { prop: "tarjetas", claves: ["id", "nombre", "imagen"] },
+    OptionComparator: { prop: "opciones", claves: ["id", "nombre", "pagoMensual"] },
+  };
+
+  for (const m of messages) {
+    if (!("updateComponents" in m)) continue;
+    for (const c of m.updateComponents.components) {
+      const forma = FORMAS[c.component];
+      if (!forma) continue;
+      const valor = c[forma.prop];
+      if (!Array.isArray(valor) || valor.length === 0) continue;
+
+      const primero = valor[0];
+      if (typeof primero !== "object" || primero === null) continue;
+      const presentes = Object.keys(primero as Record<string, unknown>);
+      const faltantes = forma.claves.filter((k) => !presentes.includes(k));
+
+      if (faltantes.length > 0) {
+        errores.push(
+          `En ${c.id} (${c.component}), cada elemento de "${forma.prop}" necesita las claves ${forma.claves
+            .map((k) => `"${k}"`)
+            .join(", ")} y le faltan ${faltantes.map((k) => `"${k}"`).join(", ")}. Mandaste ${presentes
+            .map((k) => `"${k}"`)
+            .join(", ")}. El widget lee esas claves por nombre: con otras se dibuja vacio y el usuario ve una tarjeta en blanco.`,
+        );
+      }
+    }
+  }
+
+  /*
+   * NextSteps no puede ofrecer lo que el asesor no sabe hacer.
+   *
+   * Es una trampa que nos ponemos solos: el modelo propone "Como empezar a
+   * invertir mis ahorros", el usuario lo pica —el boton manda ese texto tal
+   * cual como consulta nueva— y la siguiente pantalla es la tarjeta de "eso se
+   * sale de lo que puedo resolver". Un callejon sin salida construido por
+   * nosotros, y encima el usuario ya habia confiado en el boton.
+   */
+  const FUERA_DEL_DOMINIO = /invers|invertir|seguro|afore|patrimonio|tramite|sucursal|remesa|divisa|cripto/i;
+  for (const m of messages) {
+    if (!("updateComponents" in m)) continue;
+    for (const c of m.updateComponents.components) {
+      if (c.component !== "NextSteps" || !Array.isArray(c.pasos)) continue;
+      for (const paso of c.pasos as { texto?: unknown }[]) {
+        if (typeof paso?.texto === "string" && FUERA_DEL_DOMINIO.test(paso.texto)) {
+          errores.push(
+            `El paso "${paso.texto}" de ${c.id} propone algo que este asesor NO resuelve. Si el usuario lo pica, la pantalla siguiente le dice que no puedes ayudarlo: un callejon sin salida que le pusimos nosotros. Cambialo por una consulta de tarjetas, creditos o prestamos.`,
+          );
+        }
+      }
+    }
+  }
+
   if (usados.has("ActionPlan")) {
     errores.push("Usaste ActionPlan y esta prohibido: el producto es un tablero, no un flujo de contratacion. Cambialo por datos y alternativas con su costo.");
   }

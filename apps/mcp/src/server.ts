@@ -113,6 +113,137 @@ function buildServer(): McpServer {
     },
   );
 
+  /*
+   * "Que productos tengo" es la primera pregunta de cualquiera que entra a su
+   * banca, y hasta ahora no habia con que responderla: el perfil solo exponia
+   * la tarjeta. Esta tool arma la cartera completa desde las columnas del seed.
+   *
+   * Devuelve SOLO lo que el dato sostiene. El seed dice si el cliente tiene un
+   * credito personal y cuantos creditos activos hay, pero no el monto, la tasa
+   * ni la mensualidad de cada uno. Inventar esas cifras seria el peor bug
+   * posible en una pantalla bancaria, asi que el campo `detalle` dice
+   * explicitamente que no esta disponible y la UI lo refleja.
+   */
+  server.registerTool(
+    "get_my_products",
+    {
+      description:
+        "[read] Cartera del cliente: que productos bancarios tiene contratados (cuenta de debito, tarjeta de credito, credito personal, automotriz, hipotecario, empresarial, inversiones), con la cifra relevante de cada uno y un resumen de su deuda total. Usala para 'que productos tengo', 'analiza mi perfil', 'mis creditos' o 'mis prestamos'. El detalle por credito individual NO existe en los datos: no lo inventes. Datos sinteticos.",
+      inputSchema: {
+        clienteId: z
+          .string()
+          .optional()
+          .describe(`Id tipo "CLI131". Si lo omites se usa el cliente de la conversacion.`),
+      },
+    },
+    async ({ clienteId }) => {
+      const cliente = getCliente(clienteId);
+      if (!cliente) return fail(`No existe el cliente "${clienteId}".`);
+
+      const pct = (parte: number | null, total: number | null) =>
+        parte !== null && total !== null && total > 0 ? Math.round((parte / total) * 1000) / 10 : null;
+
+      const productos = [
+        {
+          id: "debito",
+          tipo: "Cuenta de debito",
+          familia: "cuenta",
+          contratado: cliente.tieneCuentaDebito,
+          cifra: cliente.saldoPromedioCuenta,
+          cifraEtiqueta: "Saldo promedio",
+          detalle: null,
+        },
+        {
+          id: "tarjeta",
+          tipo: "Tarjeta de credito",
+          familia: "tarjeta",
+          contratado: cliente.tieneTarjetaCredito,
+          cifra: cliente.saldoTarjeta,
+          cifraEtiqueta: "Saldo actual",
+          detalle:
+            cliente.limiteCredito === null
+              ? null
+              : {
+                  limite: cliente.limiteCredito,
+                  usoPct: cliente.usoLimitePct ?? pct(cliente.saldoTarjeta, cliente.limiteCredito),
+                  gastoMensual: cliente.gastoMensualTarjeta,
+                },
+        },
+        {
+          id: "personal",
+          tipo: "Credito personal",
+          familia: "credito",
+          contratado: cliente.tieneCreditoPersonal,
+          cifra: null,
+          cifraEtiqueta: null,
+          detalle: null,
+        },
+        {
+          id: "automotriz",
+          tipo: "Credito automotriz",
+          familia: "credito",
+          contratado: cliente.tieneCreditoAutomotriz,
+          cifra: null,
+          cifraEtiqueta: null,
+          detalle: null,
+        },
+        {
+          id: "hipotecario",
+          tipo: "Credito hipotecario",
+          familia: "credito",
+          contratado: cliente.tieneCreditoHipotecario,
+          cifra: null,
+          cifraEtiqueta: null,
+          detalle: null,
+        },
+        {
+          id: "empresarial",
+          tipo: "Credito empresarial",
+          familia: "credito",
+          contratado: cliente.tieneCreditoEmpresarial,
+          cifra: null,
+          cifraEtiqueta: null,
+          detalle: null,
+        },
+        {
+          id: "inversiones",
+          tipo: "Inversiones",
+          familia: "inversion",
+          contratado: cliente.tieneInversiones,
+          cifra: null,
+          cifraEtiqueta: null,
+          detalle: null,
+        },
+      ];
+
+      return ok({
+        clienteId: cliente.id,
+        nombre: cliente.nombre,
+        contratados: productos.filter((p) => p.contratado),
+        noContratados: productos.filter((p) => !p.contratado).map((p) => p.tipo),
+        resumen: {
+          totalProductos: cliente.numeroProductosBancarios,
+          antiguedadAnios: cliente.antiguedadClienteAnios,
+          creditosActivos: cliente.creditosActivos,
+          creditosLiquidados: cliente.creditosLiquidados,
+          saldoTotalDeuda: cliente.saldoTotalDeuda,
+          ingresoMensual: cliente.ingresoMensual,
+          capacidadAhorroMensual: cliente.capacidadAhorroMensual,
+          perfilFinanciero: cliente.perfilFinanciero,
+          nivelAhorro: cliente.nivelAhorro,
+          nivelEndeudamiento: cliente.nivelEndeudamiento,
+          scoreCrediticio: cliente.scoreCrediticio,
+          clasificacionCrediticia: cliente.clasificacionCrediticia,
+          objetivoFinanciero: cliente.objetivoFinanciero,
+          productoInteres: cliente.productoInteres,
+        },
+        limitacion:
+          "El seed no trae el detalle por credito (monto, tasa, plazo ni mensualidad de cada uno). Di cuantos hay y su deuda total; no inventes cifras por credito.",
+        synthetic: SYNTHETIC,
+      });
+    },
+  );
+
   server.registerTool(
     "list_clients",
     {

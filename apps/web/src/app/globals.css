@@ -94,3 +94,44 @@ body {
   border-radius: 9999px;
   animation: girar-boton 0.7s linear infinite;
 }
+
+/*
+ * Asa para cambiar el ancho de una tarjeta del canvas.
+ *
+ * react-resizable trae su propia asa: una flecha diagonal dibujada como imagen
+ * de fondo, pensada para la esquina inferior derecha. Nosotros solo dejamos el
+ * eje horizontal (ver ModularCanvas), y esa flecha suelta a media orilla se
+ * veia como un glifo perdido en la tarjeta, no como algo que se pueda agarrar.
+ *
+ * En su lugar, una barra vertical discreta que solo aparece al pasar el cursor
+ * por la tarjeta: mientras no la necesitas, no existe.
+ */
+.react-grid-item > .react-resizable-handle-e {
+  background: none;
+  width: 10px;
+  height: 100%;
+  top: 0;
+  right: 0;
+  margin: 0;
+  padding: 0;
+  transform: none;
+  cursor: ew-resize;
+  opacity: 0;
+  transition: opacity 0.15s ease-out;
+}
+
+.react-grid-item > .react-resizable-handle-e::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 3px;
+  width: 3px;
+  height: 28px;
+  border-radius: 999px;
+  background: var(--line);
+  transform: translateY(-50%);
+}
+
+.react-grid-item:hover > .react-resizable-handle-e {
+  opacity: 1;
+}

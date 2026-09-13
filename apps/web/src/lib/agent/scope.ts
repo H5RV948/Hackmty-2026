@@ -25,13 +25,22 @@ export const SURFACE_FUERA_DE_ALCANCE = "fuera-de-alcance";
 /**
  * Vocabulario del dominio. Un solo acierto y la consulta pasa al agente.
  *
- * Incluye la jerga coloquial ("lana", "quincena", "no me alcanza", "quebrado")
- * porque quien esta ahogado en deuda no escribe "requiero una reestructura de
- * mi linea revolvente": escribe "ya no me alcanza". Dejar fuera esas palabras
- * era mandar la tarjeta de rechazo justo a quien mas necesitaba el tablero.
+ * Cubre los tres dominios del asesor —tarjetas, creditos y prestamos— mas las
+ * palabras con las que se pide una opinion ("compara", "recomienda",
+ * "conviene", "perfil", "productos"): esas son consultas legitimas aunque no
+ * nombren ningun producto.
+ *
+ * Incluye tambien la jerga coloquial ("lana", "quincena", "no me alcanza",
+ * "quebrado") porque quien esta ahogado en deuda no escribe "requiero una
+ * reestructura de mi linea revolvente": escribe "ya no me alcanza".
+ *
+ * Un caso real que se colo por no tener la palabra: "analiza mi perfil" caia en
+ * la tarjeta de rechazo, que es exactamente el analisis que el producto existe
+ * para dar. Cuando agregues un dominio, agrega su vocabulario aqui: el filtro
+ * no lo deduce.
  */
 const LEXICO_FINANCIERO =
-  /\b(tarjeta|tarjetas|plastico|credito|creditos|debito|deuda|deudas|debo|deber|debiendo|adeudo|adeudos|saldo|saldos|interes|intereses|cat|anualidad|anualidades|pago|pagos|pagar|pague|mensualidad|mensualidades|msi|plazo|plazos|reestructur\w*|refinanci\w*|liquidar|abonar|abono|prestamo|prestamos|financiamiento|hipoteca|nomina|ingreso|ingresos|sueldo|salario|gasto|gastos|gastar|ahorro|ahorrar|ahorros|presupuesto|finanzas|financier\w*|dinero|lana|varo|feria|banco|banorte|cuenta|cuentas|inversion|invertir|seguro|seguros|buro|score|linea de credito|limite|domiciliacion|cargo|cargos|comision|comisiones|cobro|cobros|cobran|endeud\w*|moroso|atraso|atrasos|quincena|alcanza|alcanzo|tasa|tasas|banca|retiro|efectivo|transferencia|spei|cashback|puntos|recompensas|quebrado|quiebra|sobregir\w*|pesos|mxn)\b/;
+  /\b(tarjeta|tarjetas|plastico|credito|creditos|debito|prestamo|prestamos|hipoteca|hipotecario|automotriz|nomina|personal|empresarial|inversion|inversiones|producto|productos|perfil|deuda|deudas|debo|deber|debiendo|adeudo|adeudos|saldo|saldos|interes|intereses|cat|anualidad|anualidades|pago|pagos|pagar|pague|mensualidad|mensualidades|msi|plazo|plazos|reestructur\w*|refinanci\w*|liquidar|abonar|abono|financiamiento|contratar|solicitar|aprobar|aprueban|califico|calificar|elegible|requisitos|comparar|compara|comparacion|recomienda|recomiendame|recomendar|recomendacion|conviene|convenir|opciones|alternativas|ingreso|ingresos|sueldo|salario|gasto|gastos|gastar|ahorro|ahorrar|ahorros|presupuesto|finanzas|financier\w*|dinero|lana|varo|feria|banco|banorte|banca|cuenta|cuentas|seguro|seguros|buro|score|puntaje|historial|linea de credito|limite|domiciliacion|cargo|cargos|comision|comisiones|cobro|cobros|cobran|endeud\w*|moroso|atraso|atrasos|quincena|alcanza|alcanzo|tasa|tasas|retiro|efectivo|transferencia|spei|cashback|puntos|recompensas|beneficios|quebrado|quiebra|sobregir\w*|pesos|mxn)\b/;
 
 /**
  * Saludos y charla suelta. Ancladas a la frase COMPLETA, no a "contiene": si
@@ -60,7 +69,7 @@ export type Clasificacion =
  * hace que "cuanto tengo que ahorrar para un viaje" se lea como una consulta de
  * ahorro y no como una de turismo. La palabra del dominio manda.
  */
-export function clasificarConsulta(texto: string): Clasificacion {
+export function clasificarConsulta(texto: string, hayTablero = false): Clasificacion {
   const limpio = normalizar(texto).trim();
 
   if (limpio.length < 3) return { dentro: false, motivo: "charla" };
@@ -69,11 +78,25 @@ export function clasificarConsulta(texto: string): Clasificacion {
   if (OTRO_DOMINIO.test(limpio)) return { dentro: false, motivo: "otro-tema" };
 
   /*
-   * Sin una sola palabra del dominio y en cuatro palabras o menos no hay de
-   * donde sacar una pantalla: "dime algo", "que hago", "sorprendeme". Pasado
-   * ese largo si dejamos correr al agente, porque una frase larga sin jerga
-   * bancaria suele ser justo el caso dificil que vale la pena atender
-   * ("llevo tres meses sin poder cerrar el mes y ya no se que hacer").
+   * Con un tablero ya en pantalla, el usuario esta a media conversacion y sus
+   * frases se apoyan en lo que esta viendo: "dame mas detalle", "y eso que
+   * significa", "explicamelo mejor". Ninguna nombra un producto y todas son
+   * legitimas — el contexto lo pone la pantalla, no la frase.
+   *
+   * Asi que a partir de aqui solo se filtra si el tema es claramente otro
+   * (regla de arriba, que ya corrio). Antes no: "dame mas detalle" recibia la
+   * tarjeta de "eso no lo puedo resolver" con el tablero justo debajo
+   * contestando esa misma pregunta.
+   */
+  if (hayTablero) return { dentro: true };
+
+  /*
+   * Arrancando en frio es otra cosa. Sin una sola palabra del dominio y en
+   * cuatro palabras o menos no hay de donde sacar una pantalla: "dime algo",
+   * "que hago", "sorprendeme". Pasado ese largo si dejamos correr al agente,
+   * porque una frase larga sin jerga bancaria suele ser justo el caso dificil
+   * que vale la pena atender ("llevo tres meses sin poder cerrar el mes y ya no
+   * se que hacer").
    */
   const palabras = limpio.split(" ").filter(Boolean).length;
   if (palabras <= 4) return { dentro: false, motivo: "otro-tema" };
@@ -108,12 +131,16 @@ function copia(motivo: "charla" | "otro-tema", consulta: string) {
 /**
  * Tarjeta de fuera de alcance, ya en A2UI.
  *
- * `layoutPrevio` es el layout que el canvas tiene ahora mismo, tal como lo
- * reporto el cliente. Hace falta porque updateCanvasLayout REEMPLAZA el layout
- * completo (AGENTS.md y surfaceStore): mandar solo esta tarjeta borraria de la
- * pantalla el tablero que el usuario ya tenia, y perder un tablero por escribir
- * "hola" seria un castigo absurdo. Asi que la tarjeta se pone arriba y todo lo
- * demas baja.
+ * Sobre `layoutPrevio` y el updateCanvasLayout que va aqui: quien decide de
+ * verdad donde queda cada tarjeta es el canvas, que calcula anchos por tipo de
+ * componente y mide las alturas del contenido (ver `canvasLayout.ts`). Este
+ * mensaje ya no posiciona nada en pantalla.
+ *
+ * Se sigue mandando —y se sigue respetando el tablero previo, con la tarjeta
+ * arriba y el resto abajo— porque updateCanvasLayout REEMPLAZA el layout
+ * completo en el store: mandar solo esta tarjeta dejaria el registro del
+ * canvas sin las surfaces que el usuario ya tenia, y ese registro es lo que
+ * viaja de vuelta al servidor en la siguiente consulta.
  */
 export function fueraDeAlcanceMessages(
   motivo: "charla" | "otro-tema",

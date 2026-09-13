@@ -191,6 +191,70 @@ const examples: SurfaceState[] = [
     },
     dataModel: {},
   },
+  // Los tres niveles de la jerarquia visual, en el orden en que van en pantalla.
+  {
+    surfaceId: "g-titular",
+    catalogId: "gallery",
+    title: "HeadlineVerdict — nivel 1, la conclusion",
+    root: "titular",
+    components: {
+      titular: {
+        id: "titular",
+        component: "HeadlineVerdict",
+        veredicto: "Tu tarjeta se lleva casi toda tu linea disponible",
+        dato: "$16,525",
+        datoEtiqueta: "Saldo de tu tarjeta",
+        tono: "critical",
+        indicador: { valor: 94, etiqueta: "94% de tu limite de $17,500 usado" },
+        apoyo: [
+          { label: "Ingreso mensual", value: "$2,573" },
+          { label: "Score", value: "591" },
+          { label: "Creditos activos", value: "2" },
+        ],
+      },
+    },
+    dataModel: {},
+  },
+  {
+    surfaceId: "g-cartera",
+    catalogId: "gallery",
+    title: "ProductPortfolio — nivel 2, que tiene contratado",
+    root: "cartera",
+    components: {
+      cartera: {
+        id: "cartera",
+        component: "ProductPortfolio",
+        titulo: "Lo que tienes con nosotros",
+        productos: [
+          { id: "debito", tipo: "Cuenta de debito", familia: "cuenta", valor: "$35,610", etiqueta: "Saldo promedio" },
+          { id: "tarjeta", tipo: "Tarjeta de credito", familia: "tarjeta", valor: "$16,525", etiqueta: "Saldo actual", nota: "94% de tu limite usado" },
+          { id: "personal", tipo: "Credito personal", familia: "credito" },
+        ],
+        sinContratar: ["Credito automotriz", "Credito hipotecario", "Inversiones"],
+      },
+    },
+    dataModel: {},
+  },
+  {
+    surfaceId: "g-siguiente",
+    catalogId: "gallery",
+    title: "NextSteps — nivel 3, por donde seguir",
+    root: "siguiente",
+    components: {
+      siguiente: {
+        id: "siguiente",
+        component: "NextSteps",
+        titulo: "Y ahora, que sigue",
+        pasos: [
+          { id: "a", texto: "Comparar mi tarjeta con las demas" },
+          { id: "b", texto: "Ver cuanto bajo mi deuda si pago mil pesos mas al mes" },
+          { id: "c", texto: "Que credito me conviene con mi ingreso" },
+        ],
+        action: { event: { name: "siguiente_paso" } },
+      },
+    },
+    dataModel: {},
+  },
   // TODO(fase 2): un ejemplo por cada componente del catalogo.
 ];
 

@@ -12,6 +12,7 @@ docker compose up --build
 
 - Frontend: http://localhost:3000
 - Galeria de widgets: http://localhost:3000/dev/gallery
+- Acomodo del tablero: http://localhost:3000/dev/canvas
 - MCP (HTTP/SSE): http://localhost:8787
 
 ## Estructura

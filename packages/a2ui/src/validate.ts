@@ -8,8 +8,36 @@ import { z } from "zod";
 import catalog from "@banorte/catalog/banorte-catalog.json";
 import { A2UI_VERSION, type A2UIMessage } from "./types.ts";
 
-const CATALOG_COMPONENTS = Object.keys(
-  (catalog as { components: Record<string, unknown> }).components,
+type DefinicionCatalogo = {
+  description: string;
+  props: Record<string, { required?: boolean }>;
+};
+
+const COMPONENTES_CATALOGO = (catalog as { components: Record<string, DefinicionCatalogo> })
+  .components;
+
+const CATALOG_COMPONENTS = Object.keys(COMPONENTES_CATALOGO);
+
+/**
+ * Props obligatorias por componente, leidas del catalogo.
+ *
+ * Existe porque el esquema de un componente es `passthrough()`: las props son
+ * abiertas a proposito (cada widget declara las suyas en el catalogo, no en
+ * Zod), y eso dejaba pasar un componente SIN sus props obligatorias. El mensaje
+ * era valido, el canvas lo dibujaba, y el usuario veia una tarjeta en blanco:
+ * un fallo sin error en ningun log, que es el peor de todos.
+ *
+ * `action` se excluye a proposito aunque el catalogo la marque obligatoria:
+ * todos los widgets resuelven el nombre del evento con un valor por omision, y
+ * exigirla solo gastaria intentos de reparacion sin cambiar un pixel.
+ */
+const PROPS_OBLIGATORIAS: Record<string, string[]> = Object.fromEntries(
+  Object.entries(COMPONENTES_CATALOGO).map(([nombre, def]) => [
+    nombre,
+    Object.entries(def.props ?? {})
+      .filter(([prop, spec]) => spec?.required === true && prop !== "action")
+      .map(([prop]) => prop),
+  ]),
 );
 
 const version = z.literal(A2UI_VERSION);
@@ -136,6 +164,20 @@ export function validateA2UI(input: unknown): ValidationResult {
     if (root && !ids.has(root)) {
       errors.push(`root: "${root}" no existe en la surface.`);
     }
+
+    // Props obligatorias del catalogo. Una cadena vacia cuenta como ausente:
+    // un titulo en blanco es lo mismo que no tener titulo.
+    for (const c of components) {
+      for (const prop of PROPS_OBLIGATORIAS[c.component] ?? []) {
+        const valor = (c as Record<string, unknown>)[prop];
+        if (valor === undefined || valor === null || valor === "") {
+          errors.push(
+            `${c.id} (${c.component}): falta la prop obligatoria "${prop}". El catalogo la exige y el widget la dibuja: sin ella la tarjeta sale incompleta.`,
+          );
+        }
+      }
+    }
+
     if (errors.length > 0) return { ok: false, errors };
   }
 

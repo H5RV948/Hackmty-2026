@@ -56,33 +56,46 @@ export type Capacidad = {
 };
 
 /**
- * Lo que la tarjeta de fuera de alcance ofrece a cambio.
+ * Los accesos rapidos que se ofrecen cuando no hay una intencion clara.
  *
- * Cuatro y no diez: es una salida de un callejon, no un menu. Cada una abre una
- * de las cuatro cosas distintas que el producto sabe hacer (ordenar la deuda,
- * simular la reestructura, ver el panorama, revisar credito nuevo); poner dos
- * variantes de lo mismo solo hace la eleccion mas lenta.
+ * Son seis y estan escritos como ACCIONES cortas, no como preguntas largas, a
+ * proposito: quien escribe "hola" no sabe todavia que se le puede preguntar a
+ * esto, y leerse cuatro frases completas para elegir es mas trabajo que
+ * escanear seis etiquetas. El "porQue" de abajo hace el resto del trabajo.
+ *
+ * Cubren los tres dominios (tarjetas, creditos, prestamos) mas las dos entradas
+ * transversales: analizar el perfil y pedir una recomendacion.
  */
 export const CAPACIDADES: readonly Capacidad[] = [
   {
-    id: "deuda",
-    texto: "Quiero pagar menos intereses de mi tarjeta de credito",
-    porQue: "Reviso tu saldo y te pongo los plazos posibles con su costo real.",
+    id: "mis-tarjetas",
+    texto: "Conocer mis tarjetas",
+    porQue: "Que tarjetas tienes, como las usas y cuanto te cuestan.",
   },
   {
-    id: "simular",
-    texto: "Cuanto me ahorro si pago mi tarjeta en 12 meses en vez de 24",
-    porQue: "Simulo la reestructura con tus numeros, no con estimados.",
+    id: "comparar-tarjetas",
+    texto: "Comparar tarjetas",
+    porQue: "Lado a lado: CAT, anualidad y para cuales calificas.",
   },
   {
-    id: "panorama",
-    texto: "Como se ve mi mes: cuanto entra, cuanto sale y cuanto debo",
-    porQue: "Te armo el panorama de tu situacion en una sola pantalla.",
+    id: "mis-creditos",
+    texto: "Conocer mis creditos",
+    porQue: "Los creditos que tienes activos y como van.",
   },
   {
-    id: "tarjetas",
-    texto: "Que tarjetas de credito puedo pedir con mi ingreso",
-    porQue: "Veo para cuales calificas, su CAT y si hoy te conviene pedirlas.",
+    id: "mis-prestamos",
+    texto: "Revisar mis prestamos",
+    porQue: "Cuanto debes, a que plazo y que opciones tienes.",
+  },
+  {
+    id: "analizar-perfil",
+    texto: "Analizar mi perfil",
+    porQue: "Tu panorama completo: productos, deuda y capacidad de pago.",
+  },
+  {
+    id: "recomendar",
+    texto: "Recomendarme opciones",
+    porQue: "Que producto se ajusta mejor a tu situacion, y por que.",
   },
 ];
 

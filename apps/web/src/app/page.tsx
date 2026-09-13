@@ -186,15 +186,17 @@ export default function Home() {
       if (event.type === "canvas_layout_changed") return;
 
       /*
-       * Los dos eventos de OutOfScopeCard no son "interacciones con el
-       * tablero": son una pregunta nueva. Se convierten aqui, en el cliente, y
-       * no en el servidor, porque lo que cambia es de que tipo es el turno —y
-       * el turno es lo que el usuario ve en el historial.
+       * Hay eventos que no son "interacciones con el tablero": son una pregunta
+       * nueva escrita por el usuario, solo que la escribio picando en vez de
+       * tecleando. Los tres vienen de un boton que ya trae la consulta redactada
+       * —las sugerencias de OutOfScopeCard, su "preguntar de todos modos" y los
+       * botones de NextSteps— y se convierten aqui, en el cliente, porque lo que
+       * cambia es de que TIPO es el turno, y el turno es lo que el usuario ve en
+       * su historial. Mandarlos como ui_action dejaria el hilo lleno de
+       * "siguiente paso: paso 2" en lugar de la pregunta.
        */
-      if (
-        event.type === "ui_action" &&
-        (event.name === "sugerencia_elegida" || event.name === "consultar_de_todos_modos")
-      ) {
+      const ES_PREGUNTA = ["sugerencia_elegida", "consultar_de_todos_modos", "siguiente_paso"];
+      if (event.type === "ui_action" && ES_PREGUNTA.includes(event.name)) {
         const texto = typeof event.payload?.texto === "string" ? event.payload.texto : "";
         if (texto) {
           preguntarTexto(texto, event.name === "consultar_de_todos_modos");
@@ -346,7 +348,13 @@ export default function Home() {
           modoConsulta ? "opacity-100 delay-300" : "pointer-events-none opacity-0"
         }`}
       >
-        <div className="mx-auto max-w-6xl">
+        {/*
+          El tablero se ensancha mas alla del max-w-6xl del contenido de
+          lectura: sus tarjetas son datos en columnas, no parrafos, y a 1152px
+          en un monitor ancho el canvas dejaba dos franjas vacias a los lados
+          mientras las tarjetas se apretaban en el centro.
+        */}
+        <div className="mx-auto max-w-[1600px]">
           {/*
             Historial de la sesion. Va arriba del tablero porque es el hilo que
             lo explica: sin el, una pantalla que cambio tres veces no dice por
@@ -388,6 +396,20 @@ export default function Home() {
                 })}
               </ol>
             </section>
+          )}
+
+          {hayPantalla && (
+            <p className="mb-3 flex items-center gap-2 text-xs text-muted">
+              <svg aria-hidden viewBox="0 0 10 16" width="9" height="14" className="text-line">
+                <g fill="currentColor">
+                  <circle cx="2" cy="3" r="1.3" /><circle cx="8" cy="3" r="1.3" />
+                  <circle cx="2" cy="8" r="1.3" /><circle cx="8" cy="8" r="1.3" />
+                  <circle cx="2" cy="13" r="1.3" /><circle cx="8" cy="13" r="1.3" />
+                </g>
+              </svg>
+              Este tablero es tuyo: arrastra las tarjetas desde su titulo para acomodarlo, o jala
+              su orilla derecha para cambiarles el ancho.
+            </p>
           )}
 
           {hayPantalla ? (
