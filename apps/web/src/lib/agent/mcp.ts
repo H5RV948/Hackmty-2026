@@ -180,12 +180,15 @@ export async function precargarContexto(
    * Las dos van en paralelo: son independientes y secuenciarlas solo sumaba
    * latencia a la parte que el usuario si nota.
    */
-  const [simulacion, productos] = await Promise.all([
+  const [simulacion, productos, historial] = await Promise.all([
     // Si el cliente no trae deuda de tarjeta, la tool falla y no pasa nada: el
     // modelo tiene el perfil y decide que hacer.
     session.call("simulate_restructure", { clienteId }),
     session.call("get_my_products", { clienteId }),
+    // El historial alimenta las graficas de tendencia. Sin precargarlo, el
+    // modelo resolvia "como he ido" con la foto de hoy y graficaba nada.
+    session.call("get_financial_history", { clienteId }),
   ]);
 
-  return [perfil, simulacion, productos].filter((r) => !r.isError);
+  return [perfil, simulacion, productos, historial].filter((r) => !r.isError);
 }

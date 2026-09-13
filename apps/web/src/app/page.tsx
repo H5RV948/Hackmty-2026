@@ -322,7 +322,7 @@ export default function Home() {
               <p className="text-sm font-medium text-brand">Tu asesor financiero</p>
 
               <h1 className="mt-4 text-4xl font-bold leading-[1.12] tracking-tight text-ink sm:text-5xl">
-                Hay una decision
+                Hay una decisión
                 <br />
                 distinta para cada
                 <br />
@@ -330,8 +330,8 @@ export default function Home() {
               </h1>
 
               <p className="mt-6 max-w-[42ch] text-base leading-relaxed text-muted">
-                Cuentame que quieres resolver y armo contigo la pantalla que lo explica, con tus
-                numeros y sus costos a la vista.
+                Cuéntame qué quieres resolver y creamos la pantalla que lo explica, con tus
+                números y sus costos a la vista.
               </p>
 
               {/*

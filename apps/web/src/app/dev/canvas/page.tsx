@@ -142,6 +142,43 @@ const DONA = {
   ],
 };
 
+const HIST_TITULAR = {
+  component: "HeadlineVerdict",
+  veredicto: "Tu score bajo 57 puntos este ano: los atrasos pesan",
+  dato: "591",
+  datoEtiqueta: "Score crediticio en agosto",
+  tono: "critical",
+  indicador: { valor: 53, etiqueta: "591 de 850" },
+};
+const HIST_LINEA = {
+  component: "LineChart",
+  titulo: "Tu score crediticio mes a mes",
+  unidad: "pts",
+  etiquetas: ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago"],
+  series: [{ id: "score", nombre: "Score crediticio", valores: [648, 641, 636, 630, 618, 611, 600, 591] }],
+  referencia: { valor: 670, etiqueta: "Score bueno" },
+};
+const HIST_AREA = {
+  component: "CashflowChart",
+  titulo: "Tu cashflow",
+  serie: [
+    { mes: "Ene", ingreso: 2590, gasto: 1980 }, { mes: "Feb", ingreso: 2540, gasto: 1860 },
+    { mes: "Mar", ingreso: 2610, gasto: 2050 }, { mes: "Abr", ingreso: 2555, gasto: 1890 },
+    { mes: "May", ingreso: 2600, gasto: 1990 }, { mes: "Jun", ingreso: 2530, gasto: 1850 },
+    { mes: "Jul", ingreso: 2580, gasto: 1940 }, { mes: "Ago", ingreso: 2573, gasto: 1910 },
+  ],
+};
+const HIST_PROGRESO = {
+  component: "ProgressBars",
+  titulo: "Tu salud financiera",
+  total: { valor: 41, maximo: 100, etiqueta: "Finance score", nivel: "en riesgo" },
+  barras: [
+    { id: "ahorro", label: "Capacidad de ahorro", valor: 100, nota: "Te queda libre el 26% de tu ingreso al mes." },
+    { id: "uso", label: "Uso de tu linea de credito", valor: 0, nota: "Usas el 94% de tu limite." },
+    { id: "score", label: "Score crediticio", valor: 53, nota: "Tu score es 591 de 850." },
+  ],
+};
+
 const TABLEROS: Record<string, SurfaceState[]> = {
   "Tarjetas (el de tu captura)": [
     surface("s1", "Alerta de riesgo", RIESGO),
@@ -170,6 +207,13 @@ const TABLEROS: Record<string, SurfaceState[]> = {
     surface("s2", "Tu situacion", SALUD),
     surface("s3", "Simulador", SIMULADOR),
     surface("s4", "Comparador", COMPARADOR),
+  ],
+  "Mi historial": [
+    surface("h1", "Tu tendencia", HIST_TITULAR),
+    surface("h2", "Historial crediticio", HIST_LINEA),
+    surface("h3", "Cashflow", HIST_AREA),
+    surface("h4", "Salud financiera", HIST_PROGRESO),
+    surface("h5", "Siguiente", SIGUIENTE),
   ],
 };
 

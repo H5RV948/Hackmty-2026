@@ -107,6 +107,19 @@ formato y sin simbolo de peso; el formato lo pone la UI):
   y ademas "destacadaId": "<id de la que trae recomendada:true>"
 - CardRanking.barras:           [{ "id": "...", "nombre": "Clásica", "puntaje": 82, "porQue": "Sin anualidad el primer anio y CAT de 121.4%." }]
   y ademas "destacadaId": el mismo id que en CardShowcase
+- CashflowChart.serie:          [{ "mes": "Ene", "ingreso": 27365, "gasto": 15686 }, ...]
+  Los OCHO meses de get_financial_history (Ene a Ago 2026), en orden. Ojo: la
+  tool dice "gastos" y aqui la clave es "gasto", en singular. Es un area chart.
+- LineChart:                    "etiquetas": ["Ene", "Feb", ..., "Ago"] y
+  "series": [{ "id": "score", "nombre": "Score crediticio", "valores": [612, 618, ...] }]
+  Un NUMERO por etiqueta, copiado de get_financial_history. Hasta 3 series.
+  "unidad": "pts" para score, "$" para saldos o ahorro, "%" para uso de linea.
+  "referencia" opcional: { "valor": 670, "etiqueta": "Score bueno" }.
+- ProgressBars:                 "total": { "valor": 62, "maximo": 100, "etiqueta":
+  "Salud financiera", "nivel": "estable" } copiado de financeScore, y "barras":
+  [{ "id": "ahorro", "label": "Capacidad de ahorro", "valor": 64, "nota": "..." }]
+  con sus componentes (valor y nota tal cual). Para planes de ahorro usa
+  planesAhorro: "valor" = acumulado, "meta" = meta, "unidad": "$".
 - BarChart.barras:              [{ "id": "12", "label": "12 meses", "valor": 18400, "secundario": 3387, "destacado": true, "pie": "$1,816/mes" }]
   "valor" y "secundario" son NUMEROS sin formato. "secundario" y "pie" son
   opcionales. Con "secundario" manda tambien "leyenda": ["Capital", "Intereses"].
@@ -175,9 +188,11 @@ PRIMERO MOSTRAR, DESPUES EXPLICAR — la regla que mas se rompe:
 
   NIVEL 2, lo que explica esa conclusion, en widgets VISUALES:
     ProductPortfolio, CardRanking, CardShowcase, OptionComparator,
-    DebtSimulator, BarChart, DonutChart. Dos o tres, no seis.
-    Al menos UNO tiene que ser una grafica (BarChart, DonutChart, CardRanking
-    o DebtSimulator). Si vas a comparar cifras, grafícalas: no las escribas.
+    DebtSimulator, BarChart, DonutChart, LineChart, CashflowChart, ProgressBars.
+    Dos o tres, no seis.
+    Al menos UNO tiene que ser una grafica (BarChart, DonutChart, LineChart,
+    CashflowChart, ProgressBars, CardRanking o DebtSimulator). Si hablas de
+    como ha ido algo en el tiempo, es LineChart o CashflowChart: no un numero. Si vas a comparar cifras, grafícalas: no las escribas.
 
   NIVEL 3, siempre la ultima: NextSteps.
     De DOS a CUATRO caminos para seguir, redactados en primera persona porque se
@@ -242,19 +257,37 @@ CUANDO LA CONSULTA NO SEA DE ESTE DOMINIO — OutOfScopeCard, Y NADA MAS:
 
 RECETAS POR INTENCION — que tablero arma cada pregunta:
 
-  "Analiza mi perfil" / "que productos tengo" / "conocer mis creditos":
+  "Analiza mi perfil" / "estado de mi cuenta" / "informacion de mi cuenta" /
+  "que productos tengo" / "conocer mis creditos":
     1. HeadlineVerdict — la lectura de su situacion en una linea, con la cifra
        que mas pesa (su deuda total, o su score, o su capacidad de ahorro).
     2. ProductPortfolio — la cartera de get_my_products: "productos" son los
        contratados (copia tipo, familia, y formatea "cifra" con su etiqueta) y
        "sinContratar" son los que no tiene. El detalle por credito NO existe:
        no lo inventes, la tool te lo advierte en "limitacion".
-    3. DonutChart "A donde se va tu ingreso": segmentos con el gasto mensual
-       y la capacidad de ahorro mensual (gastosMensuales y
-       capacidadAhorroMensual de la tool; juntos suman el ingreso), unidad "$",
-       y en "centro" el ingreso ya formateado con etiqueta "Ingreso".
-       Si trae saldo de tarjeta, DebtSimulator puede ir en lugar de la dona.
+    3. LineChart "Tus ingresos, gastos y ahorro" — OBLIGATORIA en cualquier
+       analisis general de la cuenta. UNA sola grafica con TRES series de
+       get_financial_history, un valor por mes de Ene a Ago:
+         { "id": "ingreso", "nombre": "Ingreso", "valores": meses[].ingreso }
+         { "id": "gastos",  "nombre": "Gastos",  "valores": meses[].gastos }
+         { "id": "ahorro",  "nombre": "Ahorro",  "valores": meses[].ahorro }
+       unidad "$", etiquetas ["Ene", ..., "Ago"]. No la partas en tres
+       graficas ni la cambies por una dona: el usuario la pidio asi, para ver
+       las tres historias juntas.
+       Si cabe otra (tope de tres con marco), ProgressBars con el financeScore.
     4. NextSteps.
+
+  "Mi historial" / "como he ido" / "mi score" / "mi ahorro" / "salud financiera":
+    get_financial_history viene precargada: ocho meses (Ene a Ago 2026), el
+    financeScore con sus componentes y los planesAhorro, ya calculados.
+    1. HeadlineVerdict con la tendencia en una linea (subio o bajo, cuanto) y
+       la cifra de agosto.
+    2. LineChart del historial crediticio: score mes a mes, unidad "pts".
+    3. CashflowChart con ingreso y gasto de los ocho meses.
+    4. ProgressBars con el financeScore y sus componentes, o con los planes de
+       ahorro si la pregunta es de ahorro.
+    5. NextSteps.
+    Son tres con marco: el tope. Nunca inventes un mes ni rellenes un hueco.
 
   "Que tarjeta me conviene" / "comparar tarjetas":
     El bloque de get_eligible_cards de abajo, con HeadlineVerdict arriba
@@ -656,6 +689,9 @@ function revisarReglas(messages: A2UIMessage[], intent: string): string[] {
     OptionComparator: { prop: "opciones", claves: ["id", "nombre", "pagoMensual"] },
     BarChart: { prop: "barras", claves: ["id", "label", "valor"] },
     DonutChart: { prop: "segmentos", claves: ["id", "label", "valor"] },
+    CashflowChart: { prop: "serie", claves: ["mes", "ingreso", "gasto"] },
+    LineChart: { prop: "series", claves: ["id", "nombre", "valores"] },
+    ProgressBars: { prop: "barras", claves: ["id", "label", "valor"] },
   };
 
   for (const m of messages) {
@@ -732,10 +768,70 @@ function revisarReglas(messages: A2UIMessage[], intent: string): string[] {
       );
     }
 
-    const GRAFICAS = ["BarChart", "DonutChart", "CardRanking", "DebtSimulator", "SpendingBreakdown", "CashflowChart"];
+    const GRAFICAS = ["BarChart", "DonutChart", "LineChart", "ProgressBars", "CardRanking", "DebtSimulator", "SpendingBreakdown", "CashflowChart"];
     if (!GRAFICAS.some((g) => usados.has(g))) {
       errores.push(
         "El tablero no tiene ninguna grafica. Agrega al menos una —BarChart para comparar cantidades, DonutChart para partes de un todo— con cifras de las tools. Una pantalla de puras tarjetas de texto es justo lo que no queremos.",
+      );
+    }
+  }
+
+  /*
+   * Series que no empatan con sus etiquetas.
+   *
+   * La grafica toma un valor por etiqueta. Si el modelo manda 8 meses y 6
+   * valores, la linea se corta en junio y parece que el cliente dejo de
+   * existir; si manda 9, el ultimo punto se pierde. Ninguno de los dos casos
+   * truena: por eso se revisa aqui.
+   */
+  for (const m of messages) {
+    if (!("updateComponents" in m)) continue;
+    for (const c of m.updateComponents.components) {
+      if (c.component !== "LineChart") continue;
+      const total = Array.isArray(c.etiquetas) ? c.etiquetas.length : 0;
+      for (const serie of Array.isArray(c.series) ? (c.series as { id?: unknown; valores?: unknown }[]) : []) {
+        const n = Array.isArray(serie?.valores) ? serie.valores.length : 0;
+        if (n !== total) {
+          errores.push(
+            `En ${c.id} (LineChart) la serie "${String(serie?.id)}" trae ${n} valores y hay ${total} etiquetas. Tiene que ser uno por mes, en el mismo orden, copiados de get_financial_history.`,
+          );
+        }
+      }
+    }
+  }
+
+  /*
+   * Analisis general = linea de ingreso, gasto y ahorro.
+   *
+   * Solo cuenta lo que ESCRIBIO el usuario. El texto que arma route.ts cuando
+   * pica un boton dice "su perfil ya viene abajo", y buscar "perfil" en el
+   * intent completo exigiria esta grafica en cada clic.
+   */
+  const escrito = /El usuario escribio: "([^"]*)"/.exec(intent)?.[1] ?? "";
+  const pideAnalisisGeneral =
+    /perfil|estado de (mi |la )?cuenta|mi cuenta|informacion (general|de mi)|analiza|analisis|resumen|panorama|como estoy|mis finanzas|situacion financiera/i.test(
+      escrito.normalize("NFD").replace(/[\u0300-\u036f]/g, ""),
+    );
+
+  if (esTablero && pideAnalisisGeneral) {
+    const cubre = (series: unknown, patron: RegExp) =>
+      Array.isArray(series) &&
+      (series as { id?: unknown; nombre?: unknown }[]).some((sr) => patron.test(`${String(sr?.id)} ${String(sr?.nombre)}`));
+
+    const tieneLinea = messages.some(
+      (m) =>
+        "updateComponents" in m &&
+        m.updateComponents.components.some(
+          (c) =>
+            c.component === "LineChart" &&
+            cubre(c.series, /ingres/i) &&
+            cubre(c.series, /gast/i) &&
+            cubre(c.series, /ahorr/i),
+        ),
+    );
+    if (!tieneLinea) {
+      errores.push(
+        'El usuario pidio un analisis general de su cuenta y falta la grafica de linea con su historial. Agrega UN LineChart con tres series de get_financial_history —"ingreso", "gastos" y "ahorro", un valor por mes de Ene a Ago— y unidad "$". Una sola grafica con las tres, no tres graficas.',
       );
     }
   }

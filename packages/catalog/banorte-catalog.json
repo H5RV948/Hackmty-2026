@@ -99,16 +99,20 @@
     },
     "CashflowChart": {
       "phase": "analizar",
-      "description": "Barras agrupadas de ingreso contra gasto por mes. OJO: el seed de clientes NO trae una serie mensual, solo un mes tipico. No la uses salvo que una tool devuelva varios meses: inventar meses es inventar cifras. Para ingreso contra gasto de un solo mes usa DonutChart.",
+      "description": "Cashflow como GRAFICA DE AREA: ingreso contra gasto mes a mes. El hueco entre las dos curvas es lo que le queda al usuario. Los datos salen de get_financial_history: los ocho meses de enero a agosto de 2026, en orden. Nunca inventes meses.",
       "props": {
         "titulo": {
           "type": "string",
           "required": true
         },
+        "subtitulo": {
+          "type": "string"
+        },
         "serie": {
           "type": "array<{ mes: string, ingreso: number, gasto: number }>",
           "required": true,
-          "bindable": true
+          "bindable": true,
+          "description": "mes es la etiqueta corta (\"Ene\"). ingreso y gasto son NUMEROS copiados de meses[].ingreso y meses[].gastos."
         }
       }
     },
@@ -553,6 +557,68 @@
         "centro": {
           "type": "{ valor: string, etiqueta: string }",
           "description": "Texto en medio de la dona: el total ya formateado y que es."
+        }
+      }
+    },
+    "LineChart": {
+      "phase": "analizar",
+      "description": "Grafica de LINEA para evolucion en el tiempo: historial crediticio (score mes a mes), saldo de la tarjeta, ahorro acumulado. Hasta tres series. Muestra sola cuanto cambio de punta a punta. Los datos salen de get_financial_history.",
+      "props": {
+        "titulo": {
+          "type": "string",
+          "required": true
+        },
+        "subtitulo": {
+          "type": "string"
+        },
+        "unidad": {
+          "type": "enum",
+          "values": [
+            "$",
+            "%",
+            "pts",
+            ""
+          ],
+          "default": ""
+        },
+        "etiquetas": {
+          "type": "array<string>",
+          "required": true,
+          "bindable": true,
+          "description": "Un mes por punto, en orden: [\"Ene\", ..., \"Ago\"]."
+        },
+        "series": {
+          "type": "array<{ id: string, nombre: string, valores: number[] }>",
+          "required": true,
+          "bindable": true,
+          "description": "Uno a tres. valores tiene UN numero por etiqueta, copiado de la tool."
+        },
+        "referencia": {
+          "type": "{ valor: number, etiqueta: string }",
+          "description": "Linea punteada de referencia, p.ej. { valor: 670, etiqueta: \"Score bueno\" }."
+        }
+      }
+    },
+    "ProgressBars": {
+      "phase": "analizar",
+      "description": "BARRAS DE PROGRESO para el finance score (total y componentes) o para los planes de ahorro contra su meta. Cada barra lleva su nota con la cifra que la explica. Todo sale de get_financial_history: financeScore y planesAhorro ya vienen calculados, no los estimes.",
+      "props": {
+        "titulo": {
+          "type": "string",
+          "required": true
+        },
+        "subtitulo": {
+          "type": "string"
+        },
+        "total": {
+          "type": "{ valor: number, maximo: number, etiqueta: string, nivel: string }",
+          "description": "El numero grande de arriba: financeScore.total, maximo 100, y su nivel."
+        },
+        "barras": {
+          "type": "array<{ id: string, label: string, valor: number, meta: number, unidad: string, nota: string, tono: string }>",
+          "required": true,
+          "bindable": true,
+          "description": "Componentes del score (valor 0-100) o planes de ahorro (valor = acumulado, meta = meta, unidad \"$\")."
         }
       }
     }

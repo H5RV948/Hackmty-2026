@@ -63,6 +63,8 @@ const ANCHO_PREFERIDO: Record<string, number> = {
   CashflowChart: 6,
   BarChart: 6,
   DonutChart: 6,
+  LineChart: 6,
+  ProgressBars: 6,
   ExplorationCard: 6,
   UnderstandingSummary: 6,
   ActionPlan: 6,

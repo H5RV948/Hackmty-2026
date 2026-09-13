@@ -337,6 +337,113 @@ const examples: SurfaceState[] = [
     },
     dataModel: {},
   },
+  // Historial de enero a agosto de 2026.
+  {
+    surfaceId: "g-linea",
+    catalogId: "gallery",
+    title: "LineChart — historial crediticio",
+    root: "linea",
+    components: {
+      linea: {
+        id: "linea",
+        component: "LineChart",
+        titulo: "Tu score crediticio mes a mes",
+        subtitulo: "Enero a agosto de 2026",
+        unidad: "pts",
+        etiquetas: ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago"],
+        series: [{ id: "score", nombre: "Score crediticio", valores: [648, 641, 636, 630, 618, 611, 600, 591] }],
+        referencia: { valor: 670, etiqueta: "Score bueno" },
+      },
+    },
+    dataModel: {},
+  },
+  {
+    surfaceId: "g-linea-cuenta",
+    catalogId: "gallery",
+    title: "LineChart — ingresos, gastos y ahorro (analisis general)",
+    root: "cuenta",
+    components: {
+      cuenta: {
+        id: "cuenta",
+        component: "LineChart",
+        titulo: "Tus ingresos, gastos y ahorro",
+        subtitulo: "Enero a agosto de 2026",
+        unidad: "$",
+        etiquetas: ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago"],
+        // Orden revuelto a proposito: los colores tienen que seguir al significado.
+        series: [
+          { id: "ahorro", nombre: "Ahorro", valores: [10940, 12090, 10550, 11630, 10600, 12030, 11590, 11679] },
+          { id: "gastos", nombre: "Gastos", valores: [16240, 14820, 17100, 15390, 16880, 14960, 15720, 15686] },
+          { id: "ingreso", nombre: "Ingreso", valores: [27180, 26910, 27650, 27020, 27480, 26990, 27310, 27365] },
+        ],
+      },
+    },
+    dataModel: {},
+  },
+  {
+    surfaceId: "g-area",
+    catalogId: "gallery",
+    title: "CashflowChart — area de ingreso contra gasto",
+    root: "area",
+    components: {
+      area: {
+        id: "area",
+        component: "CashflowChart",
+        titulo: "Tu cashflow",
+        subtitulo: "Lo que entra contra lo que sale",
+        serie: [
+          { mes: "Ene", ingreso: 27180, gasto: 16240 },
+          { mes: "Feb", ingreso: 26910, gasto: 14820 },
+          { mes: "Mar", ingreso: 27650, gasto: 17100 },
+          { mes: "Abr", ingreso: 27020, gasto: 15390 },
+          { mes: "May", ingreso: 27480, gasto: 16880 },
+          { mes: "Jun", ingreso: 26990, gasto: 14960 },
+          { mes: "Jul", ingreso: 27310, gasto: 15720 },
+          { mes: "Ago", ingreso: 27365, gasto: 15686 },
+        ],
+      },
+    },
+    dataModel: {},
+  },
+  {
+    surfaceId: "g-progreso",
+    catalogId: "gallery",
+    title: "ProgressBars — finance score",
+    root: "progreso",
+    components: {
+      progreso: {
+        id: "progreso",
+        component: "ProgressBars",
+        titulo: "Tu salud financiera",
+        total: { valor: 58, maximo: 100, etiqueta: "Finance score", nivel: "estable" },
+        barras: [
+          { id: "ahorro", label: "Capacidad de ahorro", valor: 100, nota: "Te queda libre el 43% de tu ingreso al mes." },
+          { id: "uso", label: "Uso de tu linea de credito", valor: 10, nota: "Usas el 84% de tu limite." },
+          { id: "puntualidad", label: "Puntualidad en tus pagos", valor: 70, nota: "1 pago atrasado en los ultimos 12 meses." },
+          { id: "score", label: "Score crediticio", valor: 53, nota: "Tu score es 591 de 850." },
+        ],
+      },
+    },
+    dataModel: {},
+  },
+  {
+    surfaceId: "g-planes",
+    catalogId: "gallery",
+    title: "ProgressBars — planes de ahorro",
+    root: "planes",
+    components: {
+      planes: {
+        id: "planes",
+        component: "ProgressBars",
+        titulo: "Tus planes de ahorro",
+        barras: [
+          { id: "emergencia", label: "Fondo de emergencia", valor: 35610, meta: 47058, unidad: "$", nota: "A tu ritmo actual lo completas en 5 meses." },
+          { id: "tarjeta", label: "Liquidar tu tarjeta", valor: 0, meta: 16525, unidad: "$", nota: "Tu saldo esta en su punto mas alto desde Ago: no ha bajado." },
+        ],
+      },
+    },
+    dataModel: {},
+  },
   // TODO(fase 2): un ejemplo por cada componente del catalogo.
 ];
 

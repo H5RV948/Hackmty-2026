@@ -355,3 +355,71 @@ export const PAGO_MINIMO_PCT = 0.1;
 export function pagoMinimoEstimado(saldo: number): number {
   return Math.round(saldo * PAGO_MINIMO_PCT);
 }
+
+/* ------------------------------------------------------------------ */
+/* Historial mensual                                                   */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Un mes del historial de un cliente, de enero a agosto de 2026.
+ *
+ * Sale de `historial_mensual_sintetico.csv`, que genera
+ * `seed/generar_historial.py`. Agosto cuadra al peso con el perfil del cliente:
+ * el ultimo punto de cada grafica es la cifra que el titular ya mostro.
+ */
+export type MesHistorial = {
+  /** "2026-01" */
+  mes: string;
+  /** "Ene" */
+  etiqueta: string;
+  ingreso: number | null;
+  gastos: number | null;
+  /** Ingreso menos gastos. Puede ser negativo: hubo meses en que gasto de mas. */
+  ahorro: number | null;
+  /** Lo que tiene guardado al cierre del mes. En agosto, su saldo promedio de cuenta. */
+  ahorroAcumulado: number | null;
+  saldoTarjeta: number | null;
+  usoLimitePct: number | null;
+  scoreCrediticio: number | null;
+  pagosAtrasados: number | null;
+};
+
+/**
+ * Lector propio y no `num()`: aqui SI hay negativos legitimos (un mes con mas
+ * gasto que ingreso), y conviene no depender de como trate el signo el lector
+ * del padron.
+ */
+function numeroHistorial(valor: string | undefined): number | null {
+  if (valor === undefined || valor.trim() === "") return null;
+  const n = Number(valor);
+  return Number.isFinite(n) ? n : null;
+}
+
+const historialPorCliente = new Map<string, MesHistorial[]>();
+
+for (const r of readSeed("historial_mensual_sintetico.csv")) {
+  const id = r.cliente_id.trim().toUpperCase();
+  const lista = historialPorCliente.get(id) ?? [];
+  lista.push({
+    mes: r.mes,
+    etiqueta: r.etiqueta,
+    ingreso: numeroHistorial(r.ingreso_mxn),
+    gastos: numeroHistorial(r.gastos_mxn),
+    ahorro: numeroHistorial(r.ahorro_mxn),
+    ahorroAcumulado: numeroHistorial(r.ahorro_acumulado_mxn),
+    saldoTarjeta: numeroHistorial(r.saldo_tarjeta_mxn),
+    usoLimitePct: numeroHistorial(r.uso_limite_pct),
+    scoreCrediticio: numeroHistorial(r.score_crediticio),
+    pagosAtrasados: numeroHistorial(r.pagos_atrasados),
+  });
+  historialPorCliente.set(id, lista);
+}
+
+for (const lista of historialPorCliente.values()) {
+  lista.sort((a, b) => a.mes.localeCompare(b.mes));
+}
+
+/** Los meses del cliente en orden cronologico, o [] si no tiene historial. */
+export function historialDe(clienteId: string): MesHistorial[] {
+  return historialPorCliente.get(clienteId.trim().toUpperCase()) ?? [];
+}

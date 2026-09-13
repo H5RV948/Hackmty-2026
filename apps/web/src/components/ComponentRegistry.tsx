@@ -32,6 +32,8 @@ export const ComponentRegistry: Record<string, ComponentType<WidgetProps>> = {
   NextSteps: W.NextSteps,
   BarChart: W.BarChart,
   DonutChart: W.DonutChart,
+  LineChart: W.LineChart,
+  ProgressBars: W.ProgressBars,
 };
 
 export function isRegistered(type: string): boolean {

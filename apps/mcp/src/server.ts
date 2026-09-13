@@ -20,11 +20,13 @@ import {
   clientes,
   clientesConTarjeta,
   getCliente,
+  historialDe,
   pagoMinimoEstimado,
   plazosReestructura,
   tarjetasCredito,
 } from "./data.js";
 import { simularReestructura } from "./finance.js";
+import { calcularSaludFinanciera, planesDeAhorro } from "./salud.js";
 import { evaluarElegibilidad, evaluarRiesgoDeuda, puntuar } from "./eligibility.js";
 import {
   emptyUnderstanding,
@@ -239,6 +241,52 @@ function buildServer(): McpServer {
         },
         limitacion:
           "El seed no trae el detalle por credito (monto, tasa, plazo ni mensualidad de cada uno). Di cuantos hay y su deuda total; no inventes cifras por credito.",
+        synthetic: SYNTHETIC,
+      });
+    },
+  );
+
+  /*
+   * Historial de enero a agosto de 2026 mas los indicadores que salen de el.
+   *
+   * Existe para las graficas de tendencia: la linea del score, el area de
+   * ingreso contra gasto, las barras de progreso del ahorro. Sin esta tool el
+   * modelo solo tenia la foto de hoy, y una grafica "historica" habria sido
+   * un invento con forma de dato.
+   *
+   * El financeScore y los planes los calcula salud.ts, no el modelo: una barra
+   * de progreso con un numero inventado miente con autoridad visual.
+   */
+  server.registerTool(
+    "get_financial_history",
+    {
+      description:
+        "[read] Historial mensual del cliente de enero a agosto de 2026: ingreso, gastos, ahorro, ahorro acumulado, saldo y uso de tarjeta, score crediticio y pagos atrasados por mes. Agosto coincide con el perfil actual. Incluye financeScore (0-100, con componentes y nota) y planesAhorro (meta, acumulado y progreso). Usala para graficas de tendencia, historial crediticio, cashflow, salud financiera y planes de ahorro. No inventes meses fuera de este rango. Datos sinteticos.",
+      inputSchema: {
+        clienteId: z
+          .string()
+          .optional()
+          .describe(`Id tipo "CLI131". Si lo omites se usa el cliente de la conversacion.`),
+      },
+    },
+    async ({ clienteId }) => {
+      const cliente = getCliente(clienteId);
+      if (!cliente) return fail(`No existe el cliente "${clienteId}".`);
+
+      const meses = historialDe(cliente.id);
+      if (meses.length === 0) {
+        return fail(`El cliente ${cliente.id} no tiene historial mensual. No lo inventes.`);
+      }
+
+      return ok({
+        clienteId: cliente.id,
+        nombre: cliente.nombre,
+        periodo: "Enero a agosto de 2026",
+        meses,
+        financeScore: calcularSaludFinanciera(cliente, meses),
+        planesAhorro: planesDeAhorro(cliente, meses),
+        supuestos:
+          "El historial mensual es sintetico y termina en agosto de 2026 con las cifras del perfil. El financeScore y los planes de ahorro son un calculo del asesor para el reto, no una calificacion oficial.",
         synthetic: SYNTHETIC,
       });
     },

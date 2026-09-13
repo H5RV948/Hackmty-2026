@@ -64,7 +64,8 @@ export function Stat({ label, value, delta, tone = "neutral" }: WidgetProps) {
   const tones: Record<string, string> = {
     neutral: "text-ink",
     positive: "text-positive",
-    warning: "text-warning",
+    // Rojo y no el cafe del token: sobre el fondo rosado del tablero el cafe no se leia.
+    warning: "text-brand",
     critical: "text-brand",
   };
   return (
@@ -100,54 +101,60 @@ export function FinancialHealthCard({ titulo, lectura, metricas }: WidgetProps) 
 }
 
 /**
- * Ingreso contra gasto, mes por mes: barras agrupadas.
+ * Cashflow: ingreso contra gasto en el tiempo, como grafica de AREA.
  *
- * Ojo con los datos: el seed de clientes NO trae una serie mensual, solo el
- * ingreso y el gasto de un mes tipico. Este widget dibuja lo que le den, pero
- * el planner no debe inventarle meses (ver su descripcion en el catalogo).
+ * Area y no barras agrupadas: lo que importa no es cada mes suelto sino el
+ * espacio ENTRE las dos curvas, que es lo que le queda al usuario. Con areas
+ * ese hueco se ve; con barras hay que restar de cabeza.
+ *
+ * Los datos salen de get_financial_history (enero a agosto de 2026).
  */
-export function CashflowChart({ titulo, serie }: WidgetProps) {
+export function CashflowChart({ titulo, subtitulo, serie }: WidgetProps) {
   const meses = Array.isArray(serie)
     ? (serie as { mes: string; ingreso: number; gasto: number }[]).filter(
         (m) => typeof m?.ingreso === "number" && typeof m?.gasto === "number",
       )
     : [];
-  const tope = Math.max(1, ...meses.flatMap((m) => [m.ingreso, m.gasto]));
 
   return (
     <section className="space-y-3">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
+      <div>
         <h2 className="text-lg font-semibold">{String(titulo ?? "")}</h2>
-        <Leyenda items={[["bg-positive", "Ingreso"], ["bg-brand", "Gasto"]]} />
+        {subtitulo ? <p className="mt-0.5 text-xs text-muted">{String(subtitulo)}</p> : null}
       </div>
-      {meses.length === 0 ? (
-        <p className="text-xs text-muted">Sin datos para graficar.</p>
+      {meses.length < 2 ? (
+        <p className="text-xs text-muted">Hacen falta al menos dos meses para ver una tendencia.</p>
       ) : (
-        <>
-          <div className="flex h-44 items-end gap-3 border-b border-line">
-            {meses.map((m) => (
-              <div key={m.mes} className="flex h-full flex-1 items-end justify-center gap-1">
-                <div
-                  title={`Ingreso ${money(m.ingreso)}`}
-                  className="w-1/3 max-w-[20px] rounded-t bg-positive"
-                  style={{ height: `${(m.ingreso / tope) * 100}%` }}
-                />
-                <div
-                  title={`Gasto ${money(m.gasto)}`}
-                  className="w-1/3 max-w-[20px] rounded-t bg-brand"
-                  style={{ height: `${(m.gasto / tope) * 100}%` }}
-                />
-              </div>
-            ))}
-          </div>
-          <div className="flex gap-3">
-            {meses.map((m) => (
-              <p key={m.mes} className="flex-1 truncate text-center text-[11px] text-muted">
-                {m.mes}
-              </p>
-            ))}
-          </div>
-        </>
+        <LienzoSerie
+          modo="area"
+          unidad="$"
+          etiquetas={meses.map((m) => m.mes)}
+          series={[
+            { id: "ingreso", nombre: "Ingreso", valores: meses.map((m) => m.ingreso), color: COLORES_SERIE[2] },
+            /*
+              Relleno OPACO para el gasto. Con los dos rellenos translucidos,
+              el rojo encima del verde se mezclaba en un cafe lodoso. Opaco,
+              tapa el verde por debajo de su linea y lo verde que sobrevive es
+              exactamente la franja entre las dos curvas: lo que te queda.
+              Por eso el gasto se dibuja DESPUES del ingreso.
+            */
+            {
+              id: "gasto",
+              nombre: "Gasto",
+              valores: meses.map((m) => m.gasto),
+              color: { ...COLORES_SERIE[0], relleno: "var(--brand-soft)" },
+            },
+          ]}
+          lectura={(i) => {
+            const m = meses[i];
+            const libre = m.ingreso - m.gasto;
+            return [
+              { label: "Ingreso", value: money(m.ingreso), clase: "bg-positive" },
+              { label: "Gasto", value: money(m.gasto), clase: "bg-brand" },
+              { label: libre >= 0 ? "Te queda" : "Gastaste de mas", value: money(Math.abs(libre)), clase: "bg-muted-soft" },
+            ];
+          }}
+        />
       )}
     </section>
   );
@@ -493,7 +500,7 @@ export function OptionComparator({ titulo, opciones, emit, action }: WidgetProps
             <p className="tnum text-xs text-muted">al mes · {o.plazoMeses} meses</p>
             <p className="tnum mt-2 text-sm">Costo total {money(o.costoTotal)}</p>
             <p className="mt-3 text-xs text-positive">{o.ventaja}</p>
-            <p className="text-xs text-warning">{o.desventaja}</p>
+            <p className="text-xs text-brand">{o.desventaja}</p>
             <button
               type="button"
               onClick={() => emit(name, { optionId: o.id })}
@@ -1062,7 +1069,8 @@ export function HeadlineVerdict({ veredicto, dato, datoEtiqueta, tono = "neutral
   const tonos: Record<string, { texto: string; barra: string; halo: string }> = {
     neutral: { texto: "text-ink", barra: "bg-ink", halo: "bg-line/60" },
     positive: { texto: "text-positive", barra: "bg-positive", halo: "bg-positive/10" },
-    warning: { texto: "text-warning", barra: "bg-warning", halo: "bg-warning/10" },
+    // Texto en rojo: el cafe de --warning casi desaparecia sobre el hero difuminado.
+    warning: { texto: "text-brand", barra: "bg-brand/60", halo: "bg-brand-soft" },
     critical: { texto: "text-brand", barra: "bg-brand", halo: "bg-brand-soft" },
   };
   const t = tonos[String(tono)] ?? tonos.neutral;
@@ -1505,6 +1513,379 @@ export function DonutChart({ titulo, subtitulo, unidad, segmentos, centro }: Wid
           centro={centro as { valor?: string; etiqueta?: string } | undefined}
         />
       )}
+    </section>
+  );
+}
+
+/* ---------------------------------------------------------------- */
+/* Series en el tiempo: area y linea                                 */
+/* ---------------------------------------------------------------- */
+
+/*
+ * El SVG se estira al ancho de la tarjeta (preserveAspectRatio="none") para
+ * que la grafica llene su espacio en media fila o fila completa. Eso deforma
+ * los circulos, asi que los puntos van en HTML encima, posicionados en
+ * porcentaje; y los trazos usan vectorEffect="non-scaling-stroke" para no
+ * engordar en la direccion en que se estira.
+ */
+const ANCHO_SVG = 600;
+const ALTO_SVG = 200;
+
+const COLORES_SERIE = [
+  { trazo: "var(--brand)", relleno: "rgb(var(--brand-rgb) / 0.14)", clase: "bg-brand" },
+  { trazo: "var(--ink)", relleno: "rgb(var(--ink-rgb) / 0.08)", clase: "bg-ink" },
+  { trazo: "var(--positive)", relleno: "rgb(var(--positive-rgb) / 0.16)", clase: "bg-positive" },
+];
+
+type ColorSerie = (typeof COLORES_SERIE)[number];
+type Serie = { id: string; nombre: string; valores: number[]; color?: ColorSerie };
+
+function formatearCorto(valor: number, unidad: unknown): string {
+  if (!Number.isFinite(valor)) return "";
+  if (unidad === "$") {
+    const abs = Math.abs(valor);
+    if (abs >= 1_000_000) return `$${(valor / 1_000_000).toFixed(1)}M`;
+    if (abs >= 1_000) return `$${Math.round(valor / 1_000)}k`;
+    return `$${Math.round(valor)}`;
+  }
+  if (unidad === "%") return `${Math.round(valor)}%`;
+  return String(Math.round(valor));
+}
+
+function LienzoSerie({
+  etiquetas,
+  series,
+  unidad,
+  modo,
+  referencia,
+  incluirCero = true,
+  lectura,
+}: {
+  etiquetas: string[];
+  series: Serie[];
+  unidad?: unknown;
+  modo: "area" | "linea";
+  referencia?: { valor: number; etiqueta?: string };
+  incluirCero?: boolean;
+  lectura?: (i: number) => { label: string; value: string; clase: string }[];
+}) {
+  const n = etiquetas.length;
+  const [activo, setActivo] = useState<number | null>(null);
+  const indice = activo ?? n - 1;
+
+  const valores = series
+    .flatMap((sr) => sr.valores.slice(0, n))
+    .concat(referencia ? [referencia.valor] : [])
+    .filter(Number.isFinite);
+  let min = valores.length ? Math.min(...valores) : 0;
+  let max = valores.length ? Math.max(...valores) : 1;
+  if (incluirCero) min = Math.min(0, min);
+  if (max === min) max = min + 1;
+  const holgura = (max - min) * 0.1;
+  if (!(incluirCero && min === 0)) min -= holgura;
+  max += holgura;
+
+  const y = (v: number) => ALTO_SVG - ((v - min) / (max - min)) * ALTO_SVG;
+  const x = (i: number) => (n === 1 ? ANCHO_SVG / 2 : (i / (n - 1)) * ANCHO_SVG);
+  const marcas = [0, 1, 2, 3].map((k) => min + ((max - min) * k) / 3);
+
+  const colorDe = (sr: Serie, k: number) => sr.color ?? COLORES_SERIE[k % COLORES_SERIE.length];
+  const filas =
+    lectura?.(indice) ??
+    series.map((sr, k) => ({ label: sr.nombre, value: formatear(sr.valores[indice], unidad), clase: colorDe(sr, k).clase }));
+
+  return (
+    <div className="space-y-2">
+      {/* Lectura del mes bajo el cursor; sin cursor, el mes mas reciente. */}
+      <div className="flex min-h-[20px] flex-wrap items-center gap-x-4 gap-y-1">
+        <span className="text-xs font-semibold uppercase tracking-wide text-ink">{etiquetas[indice]}</span>
+        {filas.map((f) => (
+          <span key={f.label} className="inline-flex items-center gap-1.5 text-xs text-muted">
+            <span aria-hidden className={`h-2 w-2 rounded-full ${f.clase}`} />
+            {f.label}
+            <span className="tnum text-sm font-semibold text-ink">{f.value}</span>
+          </span>
+        ))}
+      </div>
+
+      <div className="flex gap-2">
+        <div className="flex h-44 w-10 shrink-0 flex-col justify-between text-right">
+          {[...marcas].reverse().map((m, k) => (
+            <span key={k} className="tnum text-[10px] leading-none text-muted">
+              {formatearCorto(m, unidad)}
+            </span>
+          ))}
+        </div>
+
+        <div className="relative h-44 min-w-0 flex-1">
+          <svg
+            viewBox={`0 0 ${ANCHO_SVG} ${ALTO_SVG}`}
+            preserveAspectRatio="none"
+            className="absolute inset-0 h-full w-full overflow-visible"
+            aria-hidden
+          >
+            {marcas.map((m, k) => (
+              <line key={k} x1="0" x2={ANCHO_SVG} y1={y(m)} y2={y(m)} stroke="var(--line)" strokeDasharray="4 4" vectorEffect="non-scaling-stroke" />
+            ))}
+            {referencia && (
+              <line x1="0" x2={ANCHO_SVG} y1={y(referencia.valor)} y2={y(referencia.valor)} stroke="var(--positive)" strokeWidth="1.5" strokeDasharray="6 4" vectorEffect="non-scaling-stroke" />
+            )}
+            {activo !== null && (
+              <line x1={x(indice)} x2={x(indice)} y1="0" y2={ALTO_SVG} stroke="var(--muted-soft)" vectorEffect="non-scaling-stroke" />
+            )}
+            {series.map((sr, k) => {
+              const puntos = sr.valores.slice(0, n).map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`);
+              const linea = `M${puntos.join(" L")}`;
+              const c = colorDe(sr, k);
+              return (
+                <g key={sr.id}>
+                  {modo === "area" && (
+                    <path d={`${linea} L${x(n - 1).toFixed(1)},${ALTO_SVG} L${x(0).toFixed(1)},${ALTO_SVG} Z`} fill={c.relleno} />
+                  )}
+                  <path d={linea} fill="none" stroke={c.trazo} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+                </g>
+              );
+            })}
+          </svg>
+
+          {series.map((sr, k) =>
+            Number.isFinite(sr.valores[indice]) ? (
+              <span
+                key={sr.id}
+                aria-hidden
+                className="pointer-events-none absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-surface shadow"
+                style={{ left: `${(x(indice) / ANCHO_SVG) * 100}%`, top: `${(y(sr.valores[indice]) / ALTO_SVG) * 100}%`, background: colorDe(sr, k).trazo }}
+              />
+            ) : null,
+          )}
+
+          {referencia?.etiqueta && (
+            <span
+              className="pointer-events-none absolute right-0 -translate-y-full pb-0.5 text-[10px] font-medium text-positive"
+              style={{ top: `${(y(referencia.valor) / ALTO_SVG) * 100}%` }}
+            >
+              {referencia.etiqueta}
+            </span>
+          )}
+
+          {/* Una franja invisible por mes: pasar el cursor lee ese mes. */}
+          <div className="absolute inset-0 flex">
+            {etiquetas.map((e, i) => (
+              <button
+                key={`${e}-${i}`}
+                type="button"
+                aria-label={`Ver ${e}`}
+                onPointerEnter={() => setActivo(i)}
+                onFocus={() => setActivo(i)}
+                onPointerLeave={() => setActivo(null)}
+                onBlur={() => setActivo(null)}
+                className="h-full flex-1 focus:outline-none"
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="relative ml-12 h-4">
+        {etiquetas.map((e, i) => (
+          <span
+            key={`${e}-${i}`}
+            className={`absolute text-[10px] ${i === indice ? "font-semibold text-ink" : "text-muted"} ${
+              i === 0 ? "" : i === n - 1 ? "-translate-x-full" : "-translate-x-1/2"
+            }`}
+            style={{ left: `${n === 1 ? 50 : (i / (n - 1)) * 100}%` }}
+          >
+            {e}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Color por SIGNIFICADO de la serie, no por su posicion.
+ *
+ * Con ingreso, gastos y ahorro en la misma linea, asignar color por orden hacia
+ * que el gasto saliera verde si el modelo lo mandaba tercero. Verde es lo que
+ * entra, rojo lo que sale o se debe, oscuro lo que se guarda: igual que en el
+ * area de cashflow, para que las dos graficas se lean con el mismo codigo.
+ */
+function colorSemantico(texto: string): ColorSerie | undefined {
+  const t = texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  if (/ingres/.test(t)) return COLORES_SERIE[2];
+  if (/gast|deuda|saldo/.test(t)) return COLORES_SERIE[0];
+  if (/ahorr/.test(t)) return COLORES_SERIE[1];
+  return undefined;
+}
+
+/**
+ * Evolucion en el tiempo: el score crediticio mes a mes, el saldo de la
+ * tarjeta, el ahorro acumulado. Hasta tres series.
+ *
+ * Arriba muestra cuanto cambio la primera serie de punta a punta, porque esa
+ * es la pregunta que el usuario trae ("¿voy mejor o peor?") y no deberia tener
+ * que calcularla mirando la linea.
+ */
+export function LineChart({ titulo, subtitulo, unidad, etiquetas, series, referencia }: WidgetProps) {
+  const et = Array.isArray(etiquetas) ? (etiquetas as unknown[]).map(String) : [];
+  const lista: Serie[] = Array.isArray(series)
+    ? (series as { id: string; nombre: string; valores: unknown[] }[])
+        .filter((sr) => Array.isArray(sr?.valores))
+        .slice(0, 3)
+        .map((sr) => ({
+          id: String(sr.id),
+          nombre: String(sr.nombre ?? ""),
+          valores: sr.valores.map(Number),
+          color: colorSemantico(`${String(sr.id)} ${String(sr.nombre ?? "")}`),
+        }))
+    : [];
+  const ref = referencia as { valor?: number; etiqueta?: string } | undefined;
+
+  const primera = lista[0]?.valores ?? [];
+  const cambio = primera.length >= 2 ? primera[primera.length - 1] - primera[0] : null;
+  // Para un saldo de deuda, bajar es bueno; para un score o un ahorro, subir.
+  const bajarEsBueno = /saldo|deuda|uso|gasto/i.test(lista[0]?.nombre ?? "");
+  const mejora = cambio !== null && (bajarEsBueno ? cambio < 0 : cambio > 0);
+
+  return (
+    <section className="space-y-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <h2 className="text-lg font-semibold">{String(titulo ?? "")}</h2>
+          {subtitulo ? <p className="mt-0.5 text-xs text-muted">{String(subtitulo)}</p> : null}
+        </div>
+        {/* Con varias series el chip no diria de cual habla: la lectura del mes ya da las tres. */}
+        {lista.length === 1 && cambio !== null && cambio !== 0 && (
+          <span
+            className={`tnum rounded-full px-2.5 py-1 text-xs font-semibold ${
+              mejora ? "bg-positive/10 text-positive" : "bg-brand-soft text-brand"
+            }`}
+          >
+            {cambio > 0 ? "+" : "−"}
+            {unidad === "pts" || !unidad ? Math.abs(Math.round(cambio)) : formatear(Math.abs(cambio), unidad)}
+            {unidad === "pts" ? " pts" : ""} desde {et[0]}
+          </span>
+        )}
+      </div>
+
+      {et.length < 2 || lista.length === 0 ? (
+        <p className="text-xs text-muted">Hacen falta al menos dos meses para ver una tendencia.</p>
+      ) : (
+        <LienzoSerie
+          modo="linea"
+          unidad={unidad}
+          etiquetas={et}
+          series={lista}
+          incluirCero={unidad === "$" || unidad === "%"}
+          referencia={typeof ref?.valor === "number" ? { valor: ref.valor, etiqueta: ref.etiqueta } : undefined}
+        />
+      )}
+    </section>
+  );
+}
+
+type Progreso = {
+  id: string;
+  label: string;
+  valor: number;
+  meta?: number;
+  unidad?: string;
+  nota?: string;
+  tono?: string;
+};
+
+/**
+ * Color de una barra segun que tan lejos va: verde cerca de la meta, rojo
+ * suave a medio camino, rojo pleno lejos.
+ *
+ * El tramo medio era el cafe de --warning y sobre el fondo rosado del tablero
+ * casi no se distinguia. Rojo suave y rojo pleno conservan la escala sin
+ * meter un tercer color que compita.
+ */
+function colorProgreso(pct: number, tono?: string): string {
+  if (tono === "critical") return "bg-brand";
+  if (tono === "positive") return "bg-positive";
+  if (tono === "warning") return "bg-brand/60";
+  return pct >= 75 ? "bg-positive" : pct >= 50 ? "bg-brand/60" : "bg-brand";
+}
+
+/** La etiqueta de nivel: texto que tiene que leerse, asi que nada de blanco sobre rojo suave. */
+function claseNivel(pct: number): string {
+  if (pct >= 75) return "bg-positive text-white";
+  if (pct >= 50) return "bg-brand-soft text-brand";
+  return "bg-brand text-white";
+}
+
+/**
+ * Barras de progreso: el finance score con sus componentes, o los planes de
+ * ahorro contra su meta.
+ *
+ * El total va grande y arriba; los componentes debajo, cada uno con la nota
+ * que explica su numero. Un "62/100" sin decir por que es un juicio, no un
+ * dato.
+ */
+export function ProgressBars({ titulo, subtitulo, total, barras }: WidgetProps) {
+  const lista = Array.isArray(barras)
+    ? (barras as Progreso[]).filter((b) => typeof b?.valor === "number")
+    : [];
+  const t = total as { valor?: number; maximo?: number; etiqueta?: string; nivel?: string } | undefined;
+  const pctTotal =
+    typeof t?.valor === "number" ? Math.max(0, Math.min(100, (t.valor / (t.maximo || 100)) * 100)) : null;
+
+  return (
+    <section className="space-y-4">
+      <div>
+        <h2 className="text-lg font-semibold">{String(titulo ?? "")}</h2>
+        {subtitulo ? <p className="mt-0.5 text-xs text-muted">{String(subtitulo)}</p> : null}
+      </div>
+
+      {t && pctTotal !== null && (
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-end gap-3">
+            <p className="tnum text-4xl font-bold leading-none text-ink">
+              {Math.round(t.valor ?? 0)}
+              <span className="text-lg font-semibold text-muted">/{t.maximo || 100}</span>
+            </p>
+            {t.etiqueta && <p className="pb-1 text-sm text-muted">{t.etiqueta}</p>}
+            {t.nivel && (
+              <span
+                className={`mb-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${claseNivel(pctTotal)}`}
+              >
+                {t.nivel}
+              </span>
+            )}
+          </div>
+          <div className="h-3 w-full overflow-hidden rounded-full bg-line">
+            <div className={`h-full rounded-full ${colorProgreso(pctTotal)}`} style={{ width: `${pctTotal}%` }} />
+          </div>
+        </div>
+      )}
+
+      <ul className="space-y-3">
+        {lista.map((b) => {
+          const meta = typeof b.meta === "number" && b.meta > 0 ? b.meta : 100;
+          const pct = Math.max(0, Math.min(100, (b.valor / meta) * 100));
+          const conUnidad = b.unidad === "$" || b.unidad === "%";
+          return (
+            <li key={b.id}>
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="text-sm text-ink">{b.label}</span>
+                <span className="tnum shrink-0 text-sm font-semibold text-ink">
+                  {conUnidad ? formatear(b.valor, b.unidad) : Math.round(b.valor)}
+                  {typeof b.meta === "number" && (
+                    <span className="font-normal text-muted"> de {conUnidad ? formatear(b.meta, b.unidad) : b.meta}</span>
+                  )}
+                </span>
+              </div>
+              <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-line">
+                <div className={`h-full rounded-full ${colorProgreso(pct, b.tono)}`} style={{ width: `${pct}%` }} />
+              </div>
+              {b.nota && <p className="mt-1 text-[11px] leading-relaxed text-muted">{b.nota}</p>}
+            </li>
+          );
+        })}
+      </ul>
     </section>
   );
 }

@@ -163,7 +163,7 @@ export function PromptBar({ value, onChange, onSubmit, thinking, showRing, input
                 setIndice((i) => (i + paso + opciones.length) % opciones.length);
               }
             }}
-            placeholder="Que informacion te gustaria consultar hoy?"
+            placeholder="¿Qué información te gustaría consultar hoy?"
             aria-label="Escribe lo que quieres resolver"
             className="relative w-full bg-transparent text-sm text-ink placeholder:text-muted focus:outline-none"
           />

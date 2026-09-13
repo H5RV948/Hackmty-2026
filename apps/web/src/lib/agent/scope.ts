@@ -239,7 +239,7 @@ const TEMAS: [Tema, RegExp][] = [
   ["deuda", /\b(interes|intereses|reestructur\w*|pagar menos|pago minimo|debo|deuda|deudas|liquidar|abonar|adeudo|plazo|plazos)\b/],
   ["tarjetas", /\b(tarjeta|tarjetas|plastico|anualidad|cat)\b/],
   ["creditos", /\b(credito|creditos|prestamo|prestamos|hipoteca|hipotecario|automotriz|financiamiento)\b/],
-  ["perfil", /\b(perfil|productos|situacion|panorama|finanzas|cartera|salud financiera|mi mes)\b/],
+  ["perfil", /\b(perfil|productos|situacion|panorama|finanzas|cartera|salud financiera|mi mes|historial|crediticio|score|ahorros|tendencia|evolucion)\b/],
 ];
 
 export function temaDe(texto: string): Tema | null {
