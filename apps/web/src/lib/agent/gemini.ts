@@ -164,10 +164,13 @@ Reglas que no se negocian:
   cabeza, nunca inventes un saldo, una tasa, un CAT o un pago mensual.
 - Si vas a hablar de reestructurar un saldo, llama simulate_restructure y usa
   sus numeros tal cual vienen.
-- Empieza por get_financial_profile para saber con quien hablas. Te va a
-  devolver un clienteId: GUARDALO y pasalo a todas las demas tools. Si no lo
-  pasas, cada tool elige otro cliente al azar y mezclarias a dos personas
-  distintas en la misma pantalla.
+- El perfil del cliente y, si tiene deuda de tarjeta, la simulacion de
+  reestructura ya vienen resueltos en el mensaje, bajo "Datos que ya consulte
+  por ti". NO vuelvas a llamar esas tools: ya tienes su respuesta, y repetir
+  get_financial_profile puede cambiarte de cliente a media pantalla.
+- De esos datos sacas el clienteId: GUARDALO y pasalo a todas las demas tools
+  que si necesites llamar. Si no lo pasas, cada tool elige otro cliente al azar
+  y mezclarias a dos personas distintas en la misma pantalla.
 - Ya sabes como se llama: hablale por su nombre de pila, una o dos veces, sin
   abusar. Nada de repetir el nombre completo en cada frase.
 - No llames apply_restructure_plan salvo que el evento del usuario sea una
@@ -198,7 +201,32 @@ export type Reasoning = {
  * Nosotros seguimos despachando las tools a mano — el chat maneja la
  * conversacion, MCP ejecuta.
  */
-export async function reason(intent: string, mcp: McpSession): Promise<Reasoning> {
+export async function reason(
+  intent: string,
+  mcp: McpSession,
+  precargados: ToolResult[] = [],
+): Promise<Reasoning> {
+  /*
+   * Los datos precargados entran como parte del primer mensaje, no como un
+   * turno de herramienta falso: inventar un turno del modelo lo obliga a
+   * firmar un razonamiento que nunca hizo (ver la nota del thoughtSignature).
+   *
+   * El "no las vuelvas a llamar" no es cosmetico. get_financial_profile con
+   * nuevoCaso cambia de cliente: si el modelo la repite, la mitad de la
+   * pantalla queda con las cifras de otra persona.
+   */
+  const contexto =
+    precargados.length === 0
+      ? ""
+      : [
+          "",
+          "## Datos que ya consulte por ti",
+          "Estos son resultados REALES de las herramientas. Usalos tal cual y NO",
+          "vuelvas a llamar esas tools: ya tienes su respuesta.",
+          ...precargados.map((r) => `\n### ${r.name}\n${r.text}`),
+        ].join("\n");
+
+  const primerMensaje = intent + contexto;
   // El chat queda atado a un modelo, asi que si hay que cambiar de modelo se
   // reinicia la conversacion completa. Las tools son idempotentes (todas son
   // `read`), asi que repetirlas no tiene efectos secundarios.
@@ -212,15 +240,21 @@ export async function reason(intent: string, mcp: McpSession): Promise<Reasoning
       },
     });
 
-    const facts: ToolResult[] = [];
+    const facts: ToolResult[] = [...precargados];
     let summary = "";
-    let response = await chat.sendMessage({ message: intent });
+    let response = await chat.sendMessage({ message: primerMensaje });
+
+    // Cada vuelta de este loop es una llamada al modelo MAS, y son
+    // secuenciales. Se registran para poder ver si la precarga esta sirviendo:
+    // con el perfil y la simulacion servidos, lo normal es cero vueltas.
+    const pedidas: string[] = [];
 
     for (let turn = 0; turn < MAX_TOOL_TURNS; turn++) {
       const { text, calls } = readResponse(response);
       if (text) summary = text;
       if (calls.length === 0) break;
 
+      pedidas.push(...calls.map((c) => c.name));
       const executed = await Promise.all(calls.map((call) => mcp.call(call.name, call.args)));
       facts.push(...executed);
 
@@ -230,6 +264,12 @@ export async function reason(intent: string, mcp: McpSession): Promise<Reasoning
         })),
       });
     }
+
+    console.info(
+      `[gemini] ${modelo} · precargadas ${precargados.length} · turnos de tool ${
+        pedidas.length === 0 ? "0" : `${pedidas.length} (${pedidas.join(", ")})`
+      }`,
+    );
 
     if (!summary) summary = readResponse(response).text;
 

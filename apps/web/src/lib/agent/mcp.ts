@@ -124,3 +124,51 @@ export async function openMcpSession(): Promise<McpSession> {
     },
   };
 }
+
+/** Saca el id del cliente del JSON que devuelve get_financial_profile. */
+function leerClienteId(texto: string): string | null {
+  try {
+    const datos = JSON.parse(texto) as { cliente?: { id?: unknown } };
+    const id = datos.cliente?.id;
+    return typeof id === "string" ? id : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Precarga las tools que el razonador va a pedir de todos modos.
+ *
+ * El razonamiento era la fase lenta del ciclo: ~19s de los ~23s totales. No
+ * porque las tools tarden —son locales, responden en milisegundos— sino porque
+ * cada turno de herramienta es una llamada al modelo MAS, y son secuenciales:
+ * el modelo pide el perfil, esperamos; se lo damos y pide la simulacion,
+ * esperamos; se la damos y recien ahi escribe. Tres viajes al modelo para dos
+ * datos que sabiamos de antemano que iba a necesitar.
+ *
+ * El perfil SIEMPRE hace falta (su propio system prompt le dice que empiece por
+ * ahi) y la simulacion se deriva de el. Asi que los pedimos nosotros antes de
+ * arrancar y se los entregamos servidos. El modelo suele quedarse en un solo
+ * viaje, y sigue teniendo las tools por si necesita otra cosa.
+ *
+ * Las cifras siguen saliendo de MCP, no del modelo: lo unico que cambia es
+ * quien pide los datos y cuando.
+ */
+export async function precargarContexto(
+  session: McpSession,
+  nuevoCaso: boolean,
+): Promise<ToolResult[]> {
+  const perfil = await session.call(
+    "get_financial_profile",
+    nuevoCaso ? { nuevoCaso: true } : {},
+  );
+  if (perfil.isError) return [];
+
+  const clienteId = leerClienteId(perfil.text);
+  if (!clienteId) return [perfil];
+
+  // Si el cliente no trae deuda de tarjeta, la tool falla y no pasa nada: el
+  // modelo tiene el perfil y decide que hacer.
+  const simulacion = await session.call("simulate_restructure", { clienteId });
+  return simulacion.isError ? [perfil] : [perfil, simulacion];
+}

@@ -14,7 +14,7 @@
  */
 import { validateA2UI } from "@banorte/a2ui";
 import type { A2UIMessage, ClientEvent } from "@banorte/a2ui";
-import { openMcpSession } from "@/lib/agent/mcp";
+import { openMcpSession, precargarContexto } from "@/lib/agent/mcp";
 import { reason } from "@/lib/agent/gemini";
 import { fallbackSurface, planSurfaces } from "@/lib/agent/planner";
 
@@ -23,13 +23,19 @@ export const maxDuration = 60;
 
 type RequestBody = { event: ClientEvent; surfaces?: string[] };
 
-/** El agente razona sobre texto, no sobre la forma interna del evento. */
+/**
+ * El agente razona sobre texto, no sobre la forma interna del evento.
+ *
+ * Ojo con lo que NO dice: ya no se le pide llamar get_financial_profile. El
+ * perfil y la simulacion llegan precargados (ver precargarContexto), y pedirle
+ * que los vuelva a llamar costaba un viaje extra al modelo y, peor, con
+ * `nuevoCaso: true` le cambiaba el cliente a media pantalla.
+ */
 function intentFromEvent(event: ClientEvent): string | null {
   if (event.type === "user_message") {
-    // Consulta nueva: aqui SI se cambia de cliente.
     return [
       `El usuario escribio: "${event.text}"`,
-      `Es una consulta nueva: llama get_financial_profile con nuevoCaso: true.`,
+      `Es una consulta nueva. Su perfil ya viene abajo: no lo vuelvas a pedir.`,
     ].join(" ");
   }
 
@@ -39,9 +45,9 @@ function intentFromEvent(event: ClientEvent): string | null {
       `El usuario interactuo con la pantalla que le generaste.`,
       `Evento "${event.name}" en el componente "${event.componentId}" de la surface "${event.surfaceId}"${payload}.`,
       `Actualiza la pantalla segun lo que esto te dice de el.`,
-      `Sigue siendo la MISMA persona: llama get_financial_profile SIN nuevoCaso`,
-      `y reutiliza su clienteId. Cambiar de cliente aqui mezclaria dos personas`,
-      `en la misma pantalla.`,
+      `Sigue siendo la MISMA persona: su perfil ya viene abajo, con su clienteId.`,
+      `Reutiliza ese clienteId en cualquier tool que llames; pedir el perfil otra`,
+      `vez mezclaria dos personas en la misma pantalla.`,
       `Si el evento confirma una accion explicitamente, recien ahi puedes ejecutar una tool de tipo write.`,
     ].join(" ");
   }
@@ -76,9 +82,28 @@ export async function POST(request: Request) {
 
       let mcp: Awaited<ReturnType<typeof openMcpSession>> | null = null;
       try {
+        /*
+         * Tiempos por fase. Sin esto, "la pantalla tarda" no se puede atacar:
+         * el razonamiento y el planner son llamadas al modelo separadas y la
+         * lenta no siempre es la misma. La sesion MCP se mide aparte porque es
+         * local y deberia ser ruido — si algun dia no lo es, se ve aqui.
+         */
+        const t0 = Date.now();
         mcp = await openMcpSession();
-        const reasoning = await reason(intent, mcp);
+        // `nuevoCaso` solo en consultas nuevas desde la barra: al reaccionar a
+        // un boton seguimos hablando con la misma persona.
+        const precargados = await precargarContexto(mcp, event.type === "user_message");
+        const tMcp = Date.now();
+        const reasoning = await reason(intent, mcp, precargados);
+        const tRazon = Date.now();
         const plan = await planSurfaces(intent, reasoning, surfaces);
+        const tPlan = Date.now();
+
+        console.info(
+          `[agent] mcp ${tMcp - t0}ms · razonamiento ${tRazon - tMcp}ms · planner ${
+            tPlan - tRazon
+          }ms · total ${tPlan - t0}ms`,
+        );
 
         if (plan.fellBack) {
           console.warn("[agent] el planner no produjo A2UI valido, va el fallback");

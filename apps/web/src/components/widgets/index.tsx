@@ -11,7 +11,7 @@
  * Para agregar uno nuevo, sigue los cinco pasos de AGENTS.md, regla 1.
  */
 
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 export type EmitFn = (name: string, payload?: Record<string, unknown>) => void;
 
@@ -149,29 +149,99 @@ export function OpportunityGrid({ titulo, opciones, emit, action }: WidgetProps)
   );
 }
 
-export function ExplorationCard({ pregunta, porQuePregunto, tipo, opciones, slot, emit, action }: WidgetProps) {
+/**
+ * Una sola pregunta progresiva.
+ *
+ * `permiteOtro` es lo que la vuelve util para desambiguar: el agente propone
+ * las dos lecturas que considera mas probables y deja una tercera salida de
+ * texto libre. Sin ese "Otro", si el agente entendio mal las dos veces el
+ * usuario no tiene como corregirlo y acaba peleandose con los chips.
+ */
+export function ExplorationCard({
+  pregunta,
+  porQuePregunto,
+  tipo,
+  opciones,
+  permiteOtro,
+  slot,
+  emit,
+  action,
+}: WidgetProps) {
   const items = Array.isArray(opciones) ? (opciones as { id: string; label: string }[]) : [];
   const name = (action as { event?: { name?: string } } | undefined)?.event?.name ?? "exploration_answer";
+
+  const [escribiendo, setEscribiendo] = useState(false);
+  const [texto, setTexto] = useState("");
+
+  // Texto libre: o lo pidio el agente con permiteOtro, o el tipo ya lo es.
+  const libre = permiteOtro === true || String(tipo) === "texto" || String(tipo) === "monto";
+  const soloTexto = String(tipo) === "texto" || String(tipo) === "monto";
+
+  const mandarTexto = () => {
+    const valor = texto.trim();
+    if (!valor) return;
+    emit(name, { slot, value: valor, libre: true });
+    setTexto("");
+    setEscribiendo(false);
+  };
+
   return (
     <section className="space-y-3">
       <p className="text-base font-medium">{String(pregunta ?? "")}</p>
       <p className="text-xs text-muted">{String(porQuePregunto ?? "")}</p>
-      {String(tipo) === "opcion" ? (
-        <div className="flex flex-wrap gap-2">
-          {items.map((o) => (
+
+      <div className="flex flex-wrap gap-2">
+        {!soloTexto &&
+          items.map((o) => (
             <button
               key={o.id}
               type="button"
-              onClick={() => emit(name, { slot, value: o.id })}
+              onClick={() => emit(name, { slot, value: o.id, label: o.label })}
               className="rounded-full border border-line px-4 py-2 text-sm transition-colors hover:border-brand hover:bg-brand-soft"
             >
               {o.label}
             </button>
           ))}
+
+        {libre && !escribiendo && (
+          <button
+            type="button"
+            onClick={() => setEscribiendo(true)}
+            className="rounded-full border border-dashed border-line px-4 py-2 text-sm text-muted transition-colors hover:border-brand hover:text-brand"
+          >
+            Otro…
+          </button>
+        )}
+      </div>
+
+      {libre && escribiendo && (
+        <div className="flex items-center gap-2">
+          <input
+            autoFocus
+            value={texto}
+            onChange={(e) => setTexto(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") mandarTexto();
+              if (e.key === "Escape") setEscribiendo(false);
+            }}
+            placeholder={soloTexto ? "Escribe tu respuesta" : "Dime con tus palabras que necesitas"}
+            aria-label="Respuesta en tus palabras"
+            className="flex-1 rounded-full border border-line bg-surface px-4 py-2 text-sm focus:border-brand focus:outline-none"
+          />
+          <button
+            type="button"
+            onClick={mandarTexto}
+            disabled={!texto.trim()}
+            className="rounded-full bg-brand px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
+          >
+            Enviar
+          </button>
         </div>
-      ) : (
-        // TODO(fase 5): inputs para escala, monto y texto libre.
-        <p className="text-xs text-muted">Pendiente: entrada de tipo {String(tipo)}.</p>
+      )}
+
+      {String(tipo) === "escala" && items.length === 0 && (
+        // TODO(fase 5): control de escala. Mientras, el texto libre sirve.
+        <p className="text-xs text-muted">Responde en tus palabras con el boton de arriba.</p>
       )}
     </section>
   );
@@ -215,9 +285,62 @@ export function UnderstandingSummary({ objetivoEntendido, supuestos, emit, actio
 /* Fase: resultado                                                   */
 /* ---------------------------------------------------------------- */
 
-export function DebtSimulator({ saldo, plazos, plazoSeleccionado, cat, pagoMensual, emit, action }: WidgetProps) {
-  const options = Array.isArray(plazos) ? (plazos as number[]) : [];
-  const name = (action as { event?: { name?: string } } | undefined)?.event?.name ?? "simulate_restructure";
+type PlazoCalculado = {
+  meses: number;
+  cat: number;
+  pagoMensual: number;
+  costoTotal?: number;
+  interesesTotales?: number;
+};
+
+/**
+ * Simulador de reestructura.
+ *
+ * Cambiar de plazo NO vuelve al agente. Antes cada chip emitia un evento que
+ * disparaba el ciclo completo —sesion MCP, razonamiento, planner, revalidacion—
+ * y tardaba ~20 segundos en contestar algo que la tool ya habia calculado en el
+ * primer turno. Ahora `simulate_restructure` manda los tres plazos de una vez
+ * en `opciones` y el chip solo cambia cual se esta viendo: cero red.
+ *
+ * Los numeros siguen sin salir del modelo. Vienen calculados de la tool MCP,
+ * que es justo lo que exige el catalogo; lo unico que vive aqui es cual de
+ * ellos se muestra, que es estado de vista y no un dato.
+ */
+export function DebtSimulator({
+  saldo,
+  opciones,
+  plazos,
+  plazoSeleccionado,
+  cat,
+  pagoMensual,
+}: WidgetProps) {
+  const calculadas: PlazoCalculado[] = Array.isArray(opciones)
+    ? (opciones as PlazoCalculado[]).filter((o) => typeof o?.meses === "number")
+    : [];
+
+  // Compatibilidad con planes viejos, que mandaban plazos/cat/pagoMensual
+  // sueltos y un solo plazo calculado.
+  const legado: PlazoCalculado[] =
+    calculadas.length === 0 && Array.isArray(plazos)
+      ? (plazos as number[]).map((m) => ({
+          meses: m,
+          cat: typeof cat === "number" && m === plazoSeleccionado ? cat : Number.NaN,
+          pagoMensual:
+            typeof pagoMensual === "number" && m === plazoSeleccionado ? pagoMensual : Number.NaN,
+        }))
+      : [];
+
+  const lista = calculadas.length > 0 ? calculadas : legado;
+  const inicial = typeof plazoSeleccionado === "number" ? plazoSeleccionado : lista[0]?.meses;
+
+  const [elegido, setElegido] = useState<number | undefined>(inicial);
+
+  // Si el agente regenera el widget con otro plazo, la vista lo sigue.
+  useEffect(() => setElegido(inicial), [inicial]);
+
+  const actual = lista.find((o) => o.meses === elegido) ?? lista[0];
+  const numero = (n: number | undefined) => (typeof n === "number" && !Number.isNaN(n) ? n : undefined);
+
   return (
     <section className="space-y-4">
       <div>
@@ -225,23 +348,45 @@ export function DebtSimulator({ saldo, plazos, plazoSeleccionado, cat, pagoMensu
         <p className="tnum text-2xl font-semibold">{money(saldo)}</p>
       </div>
       <div className="flex flex-wrap gap-2">
-        {options.map((p) => (
+        {lista.map((o) => (
           <button
-            key={p}
+            key={o.meses}
             type="button"
-            aria-pressed={p === plazoSeleccionado}
-            onClick={() => emit(name, { plazoMeses: p })}
+            aria-pressed={o.meses === elegido}
+            onClick={() => setElegido(o.meses)}
             className={`tnum rounded-full border px-4 py-2 text-sm transition-colors ${
-              p === plazoSeleccionado ? "border-brand bg-brand-soft font-medium" : "border-line"
+              o.meses === elegido ? "border-brand bg-brand-soft font-medium" : "border-line"
             }`}
           >
-            {p} meses
+            {o.meses} meses
           </button>
         ))}
       </div>
-      <div className="flex gap-8 border-t border-line pt-3">
-        <Stat id="pago" emit={() => {}} label="Pago mensual" value={money(pagoMensual)} />
-        <Stat id="cat" emit={() => {}} label="CAT" value={typeof cat === "number" ? `${cat}%` : "—"} />
+      <div className="flex flex-wrap gap-8 border-t border-line pt-3">
+        <Stat
+          id="pago"
+          emit={() => {}}
+          label="Pago mensual"
+          value={numero(actual?.pagoMensual) !== undefined ? money(actual?.pagoMensual) : "—"}
+        />
+        <Stat
+          id="cat"
+          emit={() => {}}
+          label="CAT"
+          value={numero(actual?.cat) !== undefined ? `${actual?.cat}%` : "—"}
+        />
+        {numero(actual?.costoTotal) !== undefined ? (
+          <Stat id="total" emit={() => {}} label="Costo total" value={money(actual?.costoTotal)} />
+        ) : null}
+        {numero(actual?.interesesTotales) !== undefined ? (
+          <Stat
+            id="intereses"
+            emit={() => {}}
+            label="Intereses"
+            value={money(actual?.interesesTotales)}
+            tone="warning"
+          />
+        ) : null}
       </div>
       <p className="text-xs text-muted">Datos de ejemplo. El calculo lo hace la herramienta MCP, no el modelo.</p>
     </section>

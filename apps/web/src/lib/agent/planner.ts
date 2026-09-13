@@ -35,6 +35,12 @@ Formas de mensaje validas (cada una lleva "version": "${A2UI_VERSION}"):
 5. { "version": "...", "updateCanvasLayout": { "items": [ { "surfaceId": "...", "x": 0, "y": 0, "w": 6, "h": 4 } ] } }
 6. { "version": "...", "updateGuidance": { "steps": [ { "targetId": "<id de componente>", "title": "...", "body": "...", "side": "right" } ], "trigger": "auto" } }
 
+ANTES DE NADA, DECIDE SI ENTENDISTE:
+  Si la consulta admite dos lecturas que llevarian a pantallas distintas, tu
+  PRIMERA salida no es el tablero: es una pregunta de desambiguacion. Esta
+  explicada abajo en "CUANDO NO TENGAS CLARO QUE QUIERE". Tener el perfil del
+  cliente a la mano NO resuelve la ambiguedad: te dice como esta, no que quiere.
+
 Reglas duras:
 - Un widget del canvas = una surface. Crea la surface ANTES de mandarle componentes.
 - El layout (x, y, w, h) va SOLO en updateCanvasLayout, indexado por surfaceId.
@@ -89,9 +95,15 @@ formato y sin simbolo de peso; el formato lo pone la UI):
 - OpportunityGrid.opciones:     [{ "id": "...", "titulo": "...", "porQue": "...", "impactoEstimado": "..." }]
 - OptionComparator.opciones:    [{ "id": "...", "nombre": "...", "pagoMensual": 4832, "costoTotal": 115977, "plazoMeses": 24, "ventaja": "...", "desventaja": "..." }]
 - ActionPlan.pasos:             [{ "titulo": "...", "detalle": "...", "requiereConfirmacion": true }]
-- ExplorationCard.opciones:     [{ "id": "...", "label": "..." }]
+- ExplorationCard.opciones:     [{ "id": "...", "label": "..." }]  (y "permiteOtro": true para dejar texto libre)
 - UnderstandingSummary:         objetivoEntendido texto, supuestos arreglo de textos, confianza NUMERO entre 0 y 1
-- DebtSimulator:                saldo, plazoSeleccionado, cat y pagoMensual son NUMEROS, plazos es arreglo de numeros
+- DebtSimulator:                saldo y plazoSeleccionado son NUMEROS. "opciones"
+  es el arreglo COMPLETO que devolvio simulate_restructure, copiado tal cual:
+  [{ "meses": 12, "cat": 32.4, "pagoMensual": 1819, "costoTotal": 21828, "interesesTotales": 3392 }, ...]
+  MANDA SIEMPRE TODOS LOS PLAZOS que devolvio la tool, no solo el elegido. El
+  usuario cambia de plazo en el cliente, sin volver a preguntarte: si mandas uno
+  solo, los otros chips salen sin numeros. No uses "plazos", "cat" ni
+  "pagoMensual" sueltos: quedaron como legado.
 - CardShowcase.tarjetas:        [{ "id": "...", "nombre": "Clásica", "imagen": "/tarjetas/clasica.png", "bullets": ["...","..."], "cat": 121.4, "anualidad": 695, "fuente": "https://...", "fechaVerificacion": "2026-09-12" }]
 - CardRanking.barras:           [{ "id": "...", "nombre": "Clásica", "puntaje": 82, "porQue": "Sin anualidad el primer anio y CAT de 121.4%." }]
 - Copy de la UI en espanol, claro, sin jerga bancaria.
@@ -107,6 +119,35 @@ Reglas de producto:
   Nunca "te recomendamos contratar X" sin alternativas y sin costos.
 - Los datos son sinteticos y de ejemplo.
 - ExplorationCard va de una pregunta a la vez, nunca un cuestionario.
+
+CUANDO NO TENGAS CLARO QUE QUIERE — PREGUNTA, NO ADIVINES:
+  Si la consulta es ambigua, o caben dos lecturas que llevarian a pantallas
+  distintas, o te falta un dato sin el cual cualquier pantalla seria un volado:
+  no elijas al azar y no armes el tablero completo.
+
+  Emite UNA sola surface, con un solo ExplorationCard, asi:
+    "pregunta":       que necesitas aclarar, en una linea y en su idioma.
+    "porQuePregunto": por que cambia la respuesta segun lo que conteste.
+    "tipo":           "opcion"
+    "opciones":       EXACTAMENTE DOS, las dos lecturas mas probables, dichas
+                      en concreto ("Bajar mi pago mensual aunque pague mas al
+                      final" / "Pagar menos intereses en total aunque la
+                      mensualidad suba"). Nunca "Opcion A" ni "Otra cosa":
+                      cada label tiene que ser una interpretacion de verdad.
+    "permiteOtro":    true   -> la UI agrega sola un "Otro" con campo de texto.
+    "slot":           el slot que buscas llenar ("objetivo", "horizonte", ...).
+    "action":         { "event": { "name": "clarificar" } }
+
+  Ese turno NO lleva nada mas: ni tablero, ni guidance, ni otras surfaces. Solo
+  la pregunta y su updateCanvasLayout con w: 12, h: 3. En el siguiente turno ya
+  llega la respuesta del usuario y ahi si armas la pantalla completa.
+
+  Un ejemplo de cuando SI aplica: "ayudame con mis finanzas" (¿deuda? ¿ahorro?
+  ¿una tarjeta?). Uno de cuando NO: "quiero pagar menos intereses de mi
+  tarjeta" — eso ya es claro, arma el tablero.
+
+  No abuses: si con una lectura razonable puedes dar una pantalla util, dala.
+  Preguntar dos turnos seguidos es peor que asumir bien una vez.
 
 CUANDO EL USUARIO PREGUNTE POR TARJETAS — DOS COMPONENTES, SIEMPRE LOS DOS:
   Si mandas uno sin el otro el plan se rechaza completo. No es una sugerencia.
@@ -130,6 +171,9 @@ CUANDO EL USUARIO PREGUNTE POR TARJETAS — DOS COMPONENTES, SIEMPRE LOS DOS:
   porque y sus cifras, y el CardRanking con las tres que menos mal le quedarian
   y puntajes bajos que lo digan. Jamas cierres una consulta con puro texto: el
   producto es un tablero.
+
+  (Un ExplorationCard de desambiguacion NO es "puro texto": es un widget y es
+  una respuesta valida por si sola. Esta regla habla de cerrar con un parrafo.)
 
 NO USES ActionPlan. El producto es un tablero que explica la situacion y sus
 opciones con su costo, no un flujo de contratacion. Nada de "pasos sugeridos"
@@ -271,6 +315,34 @@ function explicar(candidate: unknown, errors: string[]): string {
  * Devuelve errores en el mismo formato que el validador para que entren al
  * ciclo de reparacion sin tratamiento especial.
  */
+/**
+ * Distingue "quiero una tarjeta nueva" de "mi tarjeta me esta matando".
+ *
+ * Antes esto era un `/tarjeta/i.test(intent)` pelon, y rompia el flujo
+ * principal del proyecto: la vertical es reestructura de deuda de tarjeta, o
+ * sea que casi toda consulta del caso central trae la palabra "tarjeta". La
+ * regla exigia entonces un catalogo de productos nuevos en una consulta de
+ * deuda, el plan se rechazaba tres veces y el usuario terminaba viendo un
+ * parrafo de texto en lugar de su tablero.
+ *
+ * El orden importa: las seniales de deuda mandan sobre las de catalogo, porque
+ * "cual me conviene para pagar menos intereses de mi tarjeta" es deuda, no
+ * contratacion.
+ */
+function pideProductoNuevo(intent: string): boolean {
+  const texto = intent.toLowerCase();
+
+  const deuda =
+    /interes|deuda|saldo|reestructur|pagar menos|pago minimo|pago mínimo|meses sin|debo|adeudo|liquidar|abonar/;
+  if (deuda.test(texto)) return false;
+
+  const mencionaTarjetas = /tarjeta/.test(texto);
+  const quiereElegir =
+    /cual|cuál|cuales|cuáles|recomienda|recomiend|conviene|mejor|comparar|compara|opciones|sacar|solicitar|contratar|nueva|nuevo|quiero una|muestra|muestrame|muéstrame|ensena|enséña|ver las|dame/;
+
+  return mencionaTarjetas && quiereElegir.test(texto);
+}
+
 function revisarReglas(messages: A2UIMessage[], intent: string): string[] {
   const usados = new Set<string>();
   for (const m of messages) {
@@ -322,7 +394,7 @@ function revisarReglas(messages: A2UIMessage[], intent: string): string[] {
    * el producto es un tablero, y cerrar con un parrafo de texto es justo lo
    * que no queremos. El modelo se saltaba esto cuando el cliente venia mal.
    */
-  const preguntaronPorTarjetas = /tarjeta/i.test(intent);
+  const preguntaronPorTarjetas = pideProductoNuevo(intent);
   if (preguntaronPorTarjetas && !usados.has("CardShowcase") && !usados.has("CardRanking")) {
     errores.push(
       "El usuario pregunto por tarjetas y no emitiste ni CardRanking ni CardShowcase. Aunque tu conclusion sea que no le conviene ninguna todavia, dibujala: CardRanking con las tres menos malas y puntajes bajos que lo digan, y CardShowcase con esas mismas. No cierres una consulta de tarjetas sin ensenar tarjetas.",
@@ -386,6 +458,20 @@ export async function planSurfaces(
   const system = plannerSystem();
   let prompt = plannerPrompt(intent, reasoning, surfaces);
 
+  /**
+   * Mejor plan visto: pasa el protocolo pero incumple alguna regla de producto.
+   *
+   * Existe porque el modo de falla anterior era absurdamente caro. Las reglas
+   * de `revisarReglas` son blandas —"faltan las tarjetas", "sobra un huerfano"—
+   * y aun asi invalidaban el plan COMPLETO. Un plan con 5 mensajes validos y
+   * cifras reales se tiraba tres veces y el usuario recibia un parrafo de
+   * texto: tres llamadas al modelo para terminar peor que con una.
+   *
+   * Ahora se guarda y, si se acaban los intentos, se emite. Una pantalla a la
+   * que le falta un widget es infinitamente mejor que ninguna pantalla.
+   */
+  let mejorPlan: A2UIMessage[] | null = null;
+
   for (let attempt = 0; attempt <= MAX_REPAIRS; attempt++) {
     let candidates: unknown[];
     try {
@@ -421,6 +507,8 @@ export async function planSurfaces(
       if (faltantes.length === 0) {
         return { messages: valid, repairs: attempt, fellBack: false };
       }
+      // Dibujable aunque le falte algo: se guarda por si se acaban los intentos.
+      mejorPlan = valid;
       errors.push(...faltantes);
     }
 
@@ -430,6 +518,14 @@ export async function planSurfaces(
     prompt = `${prompt}\n\n## El validador rechazo estos mensajes del intento anterior\n${errors.join(
       "\n\n",
     )}\n\nCorrige SOLO esos y vuelve a mandar el arreglo completo de mensajes, incluyendo los que si pasaron.`;
+  }
+
+  // Se acabaron los intentos. Si en algun momento hubo algo dibujable, va eso:
+  // el fallback de texto es el ultimo recurso, no el castigo por incumplir una
+  // regla de producto.
+  if (mejorPlan) {
+    console.warn("[planner] se agotaron los intentos; va el mejor plan valido aunque incumpla reglas");
+    return { messages: mejorPlan, repairs: MAX_REPAIRS, fellBack: false };
   }
 
   return {

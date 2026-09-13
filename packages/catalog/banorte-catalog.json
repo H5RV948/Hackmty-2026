@@ -176,6 +176,10 @@
         "opciones": {
           "type": "array<{ id: string, label: string }>"
         },
+        "permiteOtro": {
+          "type": "boolean",
+          "description": "Agrega una opcion 'Otro' con campo de texto libre. Uso principal: desambiguar cuando el agente no esta seguro de que pidio el usuario."
+        },
         "slot": {
           "type": "string",
           "required": true,
@@ -213,16 +217,22 @@
     },
     "DebtSimulator": {
       "phase": "resultado",
-      "description": "Simulador de reestructura. Al mover los controles emite updateDataModel; el recalculo lo hace la tool MCP, no el LLM.",
+      "description": "Simulador de reestructura. Recibe en 'opciones' los plazos YA calculados por simulate_restructure y cambia entre ellos en el cliente, sin volver al agente. El calculo lo hace la tool MCP, nunca el LLM.",
       "props": {
         "saldo": {
           "type": "number",
           "required": true,
           "bindable": true
         },
+        "opciones": {
+          "type": "array<{ meses: number, cat: number, pagoMensual: number, costoTotal: number, interesesTotales: number }>",
+          "required": true,
+          "bindable": true,
+          "description": "El arreglo completo que devuelve simulate_restructure. Manda SIEMPRE todos los plazos: cambiar de plazo es instantaneo porque los numeros ya viajaron."
+        },
         "plazos": {
           "type": "array<number>",
-          "required": true
+          "description": "Legado. Si viene 'opciones' se ignora: los plazos se derivan de ahi."
         },
         "plazoSeleccionado": {
           "type": "number",

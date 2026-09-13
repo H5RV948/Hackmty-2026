@@ -15,7 +15,13 @@
   --brand-soft: #fdeef1;
   --positive: #0f7a52;
   --warning: #b45309;
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  /*
+   * --font-brand la inyecta next/font desde layout.tsx (Montserrat, la
+   * sustituta libre de la Gotham de Banorte). El fallback va dentro del var()
+   * a proposito: si se dejara suelto en la lista y --font-brand no existiera,
+   * la declaracion entera se invalida y el texto hereda cualquier cosa.
+   */
+  --font-sans: var(--font-brand, ui-sans-serif), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
 body {

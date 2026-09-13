@@ -18,10 +18,13 @@ const examples: SurfaceState[] = [
         id: "sim",
         component: "DebtSimulator",
         saldo: 18400,
-        plazos: [12, 18, 24],
+        // Los tres plazos ya calculados: cambiar de chip no vuelve al agente.
+        opciones: [
+          { meses: 12, cat: 32.4, pagoMensual: 1816, costoTotal: 21787, interesesTotales: 3387 },
+          { meses: 18, cat: 34.1, pagoMensual: 1320, costoTotal: 23760, interesesTotales: 5360 },
+          { meses: 24, cat: 36, pagoMensual: 1086, costoTotal: 26075, interesesTotales: 7675 },
+        ],
         plazoSeleccionado: 18,
-        cat: 34.1,
-        pagoMensual: 1215,
         action: { event: { name: "simulate_restructure" } },
       },
     },
