@@ -28,12 +28,6 @@ import {
 import { simularReestructura } from "./finance.js";
 import { calcularSaludFinanciera, planesDeAhorro } from "./salud.js";
 import { evaluarElegibilidad, evaluarRiesgoDeuda, puntuar } from "./eligibility.js";
-import {
-  emptyUnderstanding,
-  isReadyToSummarize,
-  nextSlotToAsk,
-  type UserUnderstanding,
-} from "./understanding.js";
 
 const ok = (payload: unknown) => ({
   content: [{ type: "text" as const, text: JSON.stringify(payload) }],
@@ -45,15 +39,6 @@ const fail = (message: string) => ({
 });
 
 /**
- * Estado compartido entre requests, a proposito: si viviera dentro de
- * buildServer() se reiniciaria en cada llamada y el ciclo adaptativo no
- * avanzaria nunca.
- *
- * TODO(fase 5): persistir por sesion de usuario, no global.
- */
-let understanding: UserUnderstanding = emptyUnderstanding();
-
-/**
  * Una instancia de McpServer POR REQUEST.
  *
  * El SDK (>= 1.30) ya no permite reconectar la misma instancia a un transport
@@ -62,7 +47,7 @@ let understanding: UserUnderstanding = emptyUnderstanding();
  * las tools es barato, asi que armamos un servidor limpio en cada /mcp.
  */
 function buildServer(): McpServer {
-  const server = new McpServer({ name: "banorte-advisor", version: "0.2.0" });
+  const server = new McpServer({ name: "tu-rumbo-banorte", version: "0.2.0" });
 
   /* ---------------------------------------------------------------- */
   /* READ                                                              */
@@ -90,7 +75,7 @@ function buildServer(): McpServer {
       const cliente = getCliente(clienteId, nuevoCaso === true);
       if (!cliente) {
         return fail(
-          `No existe el cliente "${clienteId}". Hay ${clientes.length} clientes con ids tipo CLI001. Usa list_clients si necesitas uno.`,
+          `No existe el cliente "${clienteId}". Hay ${clientes.length} clientes con ids tipo CLI001.`,
         );
       }
 
@@ -286,35 +271,10 @@ function buildServer(): McpServer {
         financeScore: calcularSaludFinanciera(cliente, meses),
         planesAhorro: planesDeAhorro(cliente, meses),
         supuestos:
-          "El historial mensual es sintetico y termina en agosto de 2026 con las cifras del perfil. El financeScore y los planes de ahorro son un calculo del asesor para el reto, no una calificacion oficial.",
+          "El historial mensual es sintetico y termina en agosto de 2026 con las cifras del perfil. El financeScore y los planes de ahorro son un calculo de Tu rumbo Banorte para el reto, no una calificacion oficial.",
         synthetic: SYNTHETIC,
       });
     },
-  );
-
-  server.registerTool(
-    "list_clients",
-    {
-      description:
-        "[read] Lista breve de clientes con tarjeta de credito y saldo, para elegir un caso. Usala solo si necesitas un clienteId y no te dieron uno.",
-      inputSchema: {
-        limite: z.number().int().positive().max(50).optional(),
-      },
-    },
-    async ({ limite }) =>
-      ok({
-        total: clientesConTarjeta.length,
-        clientes: clientesConTarjeta.slice(0, limite ?? 10).map((c) => ({
-          id: c.id,
-          nombre: c.nombreCompleto,
-          edad: c.edad,
-          saldoTarjeta: c.saldoTarjeta,
-          usoLimitePct: c.usoLimitePct,
-          nivelEndeudamiento: c.nivelEndeudamiento,
-          objetivoFinanciero: c.objetivoFinanciero,
-        })),
-        synthetic: SYNTHETIC,
-      }),
   );
 
   server.registerTool(
@@ -419,7 +379,7 @@ function buildServer(): McpServer {
         elegibles,
         noElegibles,
         alertaDeuda,
-        nota: "Elegibilidad y puntaje calculados por el banco a partir de los requisitos publicados. El puntaje es un criterio de conveniencia del asesor, no una preaprobacion.",
+        nota: "Elegibilidad y puntaje calculados por el banco a partir de los requisitos publicados. El puntaje es un criterio de conveniencia de Tu rumbo Banorte, no una preaprobacion.",
         synthetic: false,
       });
     },
@@ -446,35 +406,6 @@ function buildServer(): McpServer {
               (t) => t.ingresoMinimo === null || t.ingresoMinimo <= ingresoMensual,
             );
       return ok({ total: productos.length, productos, synthetic: false });
-    },
-  );
-
-  /* ---------------------------------------------------------------- */
-  /* Entendimiento del usuario                                         */
-  /* ---------------------------------------------------------------- */
-
-  server.registerTool(
-    "update_understanding",
-    {
-      description:
-        "[read] Registra lo que se aprendio del usuario y devuelve el siguiente slot a preguntar. Llamala despues de cada respuesta a una ExplorationCard.",
-      inputSchema: {
-        slot: z.enum(["objetivo", "horizonte", "capacidadPago", "toleranciaRiesgo", "prioridades"]),
-        value: z.unknown(),
-        confidence: z.number().min(0).max(1),
-        source: z.string(),
-      },
-    },
-    async ({ slot, value, confidence, source }) => {
-      understanding = {
-        ...understanding,
-        [slot]: { value, confidence, source },
-      } as UserUnderstanding;
-      return ok({
-        understanding,
-        siguienteSlot: nextSlotToAsk(understanding),
-        listoParaValidar: isReadyToSummarize(understanding),
-      });
     },
   );
 

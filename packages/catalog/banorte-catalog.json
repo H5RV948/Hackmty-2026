@@ -1,7 +1,7 @@
 {
   "catalogId": "https://banorte-tec.local/catalogs/banorte/v1/catalog.json",
   "version": "1.0.0",
-  "description": "Catalogo de componentes del asesor financiero. Fuente de verdad del protocolo: el agente solo puede pedir componentes listados aqui.",
+  "description": "Catalogo de componentes de Tu rumbo Banorte. Fuente de verdad del protocolo: el agente solo puede pedir componentes listados aqui.",
   "components": {
     "Text": {
       "phase": "primitive",
@@ -25,78 +25,6 @@
         }
       }
     },
-    "Button": {
-      "phase": "primitive",
-      "description": "Accion. Dispara un evento que regresa al agente.",
-      "props": {
-        "label": {
-          "type": "string",
-          "required": true
-        },
-        "variant": {
-          "type": "enum",
-          "values": [
-            "primary",
-            "secondary",
-            "ghost"
-          ],
-          "default": "primary"
-        },
-        "action": {
-          "type": "action",
-          "required": true
-        }
-      }
-    },
-    "Stat": {
-      "phase": "primitive",
-      "description": "Un numero con su etiqueta y una variacion opcional.",
-      "props": {
-        "label": {
-          "type": "string",
-          "required": true
-        },
-        "value": {
-          "type": "string",
-          "required": true,
-          "bindable": true
-        },
-        "delta": {
-          "type": "string",
-          "bindable": true
-        },
-        "tone": {
-          "type": "enum",
-          "values": [
-            "neutral",
-            "positive",
-            "warning",
-            "critical"
-          ],
-          "default": "neutral"
-        }
-      }
-    },
-    "FinancialHealthCard": {
-      "phase": "analizar",
-      "description": "Resumen de la situacion financiera: ingreso, gasto, deuda y una lectura en lenguaje claro.",
-      "props": {
-        "titulo": {
-          "type": "string",
-          "required": true
-        },
-        "lectura": {
-          "type": "string",
-          "required": true,
-          "description": "Explicacion en lenguaje simple, sin jerga bancaria."
-        },
-        "metricas": {
-          "type": "array<Stat>",
-          "required": true,
-          "bindable": true
-        }
-      }
-    },
     "CashflowChart": {
       "phase": "analizar",
       "description": "Cashflow como GRAFICA DE AREA: ingreso contra gasto mes a mes. El hueco entre las dos curvas es lo que le queda al usuario. Los datos salen de get_financial_history: los ocho meses de enero a agosto de 2026, en orden. Nunca inventes meses.",
@@ -113,44 +41,6 @@
           "required": true,
           "bindable": true,
           "description": "mes es la etiqueta corta (\"Ene\"). ingreso y gasto son NUMEROS copiados de meses[].ingreso y meses[].gastos."
-        }
-      }
-    },
-    "SpendingBreakdown": {
-      "phase": "analizar",
-      "description": "Dona del gasto por categoria. OJO: el seed NO trae gasto por categoria. No la uses salvo que una tool devuelva categorias con monto.",
-      "props": {
-        "titulo": {
-          "type": "string",
-          "required": true
-        },
-        "categorias": {
-          "type": "array<{ nombre: string, monto: number }>",
-          "required": true,
-          "bindable": true
-        }
-      }
-    },
-    "OpportunityGrid": {
-      "phase": "posibilidades",
-      "description": "Posibilidades detectadas por el agente. El usuario selecciona una o varias; la seleccion abre la exploracion adaptativa. NO representa productos contratables, solo caminos posibles.",
-      "props": {
-        "titulo": {
-          "type": "string",
-          "required": true
-        },
-        "opciones": {
-          "type": "array<{ id: string, titulo: string, porQue: string, impactoEstimado: string }>",
-          "required": true,
-          "bindable": true
-        },
-        "seleccionMultiple": {
-          "type": "boolean",
-          "default": true
-        },
-        "action": {
-          "type": "action",
-          "required": true
         }
       }
     },
@@ -234,19 +124,7 @@
           "bindable": true,
           "description": "El arreglo completo que devuelve simulate_restructure. Manda SIEMPRE todos los plazos: cambiar de plazo es instantaneo porque los numeros ya viajaron."
         },
-        "plazos": {
-          "type": "array<number>",
-          "description": "Legado. Si viene 'opciones' se ignora: los plazos se derivan de ahi."
-        },
         "plazoSeleccionado": {
-          "type": "number",
-          "bindable": true
-        },
-        "cat": {
-          "type": "number",
-          "bindable": true
-        },
-        "pagoMensual": {
           "type": "number",
           "bindable": true
         },
@@ -378,7 +256,7 @@
     },
     "OutOfScopeCard": {
       "phase": "preguntar",
-      "description": "Respuesta a una consulta que este asesor no puede atender: un saludo, una charla suelta o un tema ajeno a las finanzas del cliente. Dice que no se puede responder eso, explica que SI se puede hacer y ofrece preguntas listas para usar. No es un mensaje de error: es la puerta de entrada para quien no sabe que preguntar.",
+      "description": "Respuesta a una consulta que Tu rumbo Banorte no puede atender: un saludo, una charla suelta o un tema ajeno a las finanzas del cliente. Dice que no se puede responder eso, explica que SI se puede hacer y ofrece preguntas listas para usar. No es un mensaje de error: es la puerta de entrada para quien no sabe que preguntar.",
       "props": {
         "titulo": {
           "type": "string",
@@ -395,7 +273,7 @@
           "type": "array<{ id: string, texto: string, porQue: string }>",
           "required": true,
           "bindable": true,
-          "description": "Preguntas que el asesor SI resuelve. 'texto' se manda tal cual como consulta al picarla, asi que escribela como la escribiria el usuario. 'porQue' dice en una linea que obtiene si la pica."
+          "description": "Preguntas que Tu rumbo Banorte SI resuelve. 'texto' se manda tal cual como consulta al picarla, asi que escribela como la escribiria el usuario. 'porQue' dice en una linea que obtiene si la pica."
         },
         "consultaOriginal": {
           "type": "string",

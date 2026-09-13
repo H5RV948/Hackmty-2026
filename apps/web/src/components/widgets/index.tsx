@@ -42,24 +42,7 @@ export function Text({ text, variant = "body" }: WidgetProps) {
   return <p className={styles[String(variant)] ?? styles.body}>{String(text ?? "")}</p>;
 }
 
-export function Button({ label, variant = "primary", emit, action }: WidgetProps) {
-  const name = (action as { event?: { name?: string } } | undefined)?.event?.name ?? "click";
-  const styles: Record<string, string> = {
-    primary: "bg-brand text-white hover:bg-brand/90",
-    secondary: "border border-line bg-surface hover:bg-brand-soft",
-    ghost: "text-brand hover:bg-brand-soft",
-  };
-  return (
-    <button
-      type="button"
-      onClick={() => emit(name)}
-      className={`rounded-full px-4 py-2 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${styles[String(variant)] ?? styles.primary}`}
-    >
-      {String(label ?? "")}
-    </button>
-  );
-}
-
+/** Cifra con etiqueta. No esta en el catalogo: la usan otros widgets por dentro. */
 export function Stat({ label, value, delta, tone = "neutral" }: WidgetProps) {
   const tones: Record<string, string> = {
     neutral: "text-ink",
@@ -82,23 +65,6 @@ export function Stat({ label, value, delta, tone = "neutral" }: WidgetProps) {
 /* ---------------------------------------------------------------- */
 /* Fase: analizar                                                    */
 /* ---------------------------------------------------------------- */
-
-type Metric = { label: string; value: string; delta?: string; tone?: string };
-
-export function FinancialHealthCard({ titulo, lectura, metricas }: WidgetProps) {
-  const items = Array.isArray(metricas) ? (metricas as Metric[]) : [];
-  return (
-    <section className="space-y-4">
-      <h2 className="text-lg font-semibold">{String(titulo ?? "")}</h2>
-      <p className="max-w-[62ch] text-sm leading-relaxed text-muted">{String(lectura ?? "")}</p>
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-        {items.map((m) => (
-          <Stat key={m.label} id={m.label} emit={() => {}} {...m} />
-        ))}
-      </div>
-    </section>
-  );
-}
 
 /**
  * Cashflow: ingreso contra gasto en el tiempo, como grafica de AREA.
@@ -160,57 +126,9 @@ export function CashflowChart({ titulo, subtitulo, serie }: WidgetProps) {
   );
 }
 
-/** A donde se va el dinero, por categoria: una dona con su leyenda. */
-export function SpendingBreakdown({ titulo, categorias }: WidgetProps) {
-  const items = Array.isArray(categorias)
-    ? (categorias as { nombre: string; monto: number }[])
-        .filter((c) => typeof c?.monto === "number" && c.monto > 0)
-        .map((c) => ({ id: c.nombre, label: c.nombre, valor: c.monto }))
-    : [];
-  const total = items.reduce((a, c) => a + c.valor, 0);
-
-  return (
-    <section className="space-y-3">
-      <h2 className="text-lg font-semibold">{String(titulo ?? "")}</h2>
-      {items.length === 0 ? (
-        <p className="text-xs text-muted">Sin datos para graficar.</p>
-      ) : (
-        <Dona segmentos={items} unidad="$" centro={{ valor: money(total), etiqueta: "Total" }} />
-      )}
-    </section>
-  );
-}
-
 /* ---------------------------------------------------------------- */
-/* Fase: posibilidades y exploracion                                 */
+/* Fase: exploracion                                                 */
 /* ---------------------------------------------------------------- */
-
-type Opportunity = { id: string; titulo: string; porQue: string; impactoEstimado: string };
-
-export function OpportunityGrid({ titulo, opciones, emit, action }: WidgetProps) {
-  const items = Array.isArray(opciones) ? (opciones as Opportunity[]) : [];
-  const name = (action as { event?: { name?: string } } | undefined)?.event?.name ?? "opportunity_selected";
-  return (
-    <section className="space-y-3">
-      <h2 className="text-lg font-semibold">{String(titulo ?? "")}</h2>
-      <ul className="grid gap-3 sm:grid-cols-2">
-        {items.map((o) => (
-          <li key={o.id}>
-            <button
-              type="button"
-              onClick={() => emit(name, { opportunityId: o.id })}
-              className="w-full rounded-xl border border-line bg-surface p-4 text-left transition-colors hover:border-brand focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand"
-            >
-              <p className="font-medium">{o.titulo}</p>
-              <p className="mt-1 text-sm text-muted">{o.porQue}</p>
-              <p className="tnum mt-2 text-sm text-positive">{o.impactoEstimado}</p>
-            </button>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
 
 /**
  * Una sola pregunta progresiva.
@@ -369,31 +287,10 @@ type PlazoCalculado = {
  * que es justo lo que exige el catalogo; lo unico que vive aqui es cual de
  * ellos se muestra, que es estado de vista y no un dato.
  */
-export function DebtSimulator({
-  saldo,
-  opciones,
-  plazos,
-  plazoSeleccionado,
-  cat,
-  pagoMensual,
-}: WidgetProps) {
-  const calculadas: PlazoCalculado[] = Array.isArray(opciones)
+export function DebtSimulator({ saldo, opciones, plazoSeleccionado }: WidgetProps) {
+  const lista: PlazoCalculado[] = Array.isArray(opciones)
     ? (opciones as PlazoCalculado[]).filter((o) => typeof o?.meses === "number")
     : [];
-
-  // Compatibilidad con planes viejos, que mandaban plazos/cat/pagoMensual
-  // sueltos y un solo plazo calculado.
-  const legado: PlazoCalculado[] =
-    calculadas.length === 0 && Array.isArray(plazos)
-      ? (plazos as number[]).map((m) => ({
-          meses: m,
-          cat: typeof cat === "number" && m === plazoSeleccionado ? cat : Number.NaN,
-          pagoMensual:
-            typeof pagoMensual === "number" && m === plazoSeleccionado ? pagoMensual : Number.NaN,
-        }))
-      : [];
-
-  const lista = calculadas.length > 0 ? calculadas : legado;
   const inicial = typeof plazoSeleccionado === "number" ? plazoSeleccionado : lista[0]?.meses;
 
   const [elegido, setElegido] = useState<number | undefined>(inicial);

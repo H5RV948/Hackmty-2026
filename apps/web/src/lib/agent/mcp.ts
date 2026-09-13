@@ -27,7 +27,7 @@ export type JsonSchema = {
   properties?: Record<string, JsonSchema>;
   required?: string[];
   items?: JsonSchema;
-  enum?: unknown[];
+  enum?: string[];
 };
 
 export type ToolResult = {
@@ -50,7 +50,8 @@ function toGeminiSchema(input: unknown): JsonSchema {
   const out: JsonSchema = {};
   if (typeof schema.type === "string") out.type = schema.type;
   if (typeof schema.description === "string") out.description = schema.description;
-  if (Array.isArray(schema.enum)) out.enum = schema.enum;
+  // Gemini solo acepta enums de texto.
+  if (Array.isArray(schema.enum)) out.enum = schema.enum.map(String);
   if (Array.isArray(schema.required)) {
     out.required = schema.required.filter((r): r is string => typeof r === "string");
   }

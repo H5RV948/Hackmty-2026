@@ -1,5 +1,5 @@
 {
-  "name": "banorte-a2ui",
+  "name": "tu-rumbo-banorte",
   "private": true,
   "packageManager": "pnpm@9.12.0",
   "workspaces": ["apps/*", "packages/*"],

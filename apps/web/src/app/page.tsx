@@ -319,7 +319,7 @@ export default function Home() {
               de tres lineas del disenio; el ancho es lo que los deja cumplirse.
             */}
             <div className="max-w-[34rem]">
-              <p className="text-sm font-medium text-brand">Tu asesor financiero</p>
+              <p className="text-sm font-medium text-brand">Tu rumbo Banorte</p>
 
               <h1 className="mt-4 text-4xl font-bold leading-[1.12] tracking-tight text-ink sm:text-5xl">
                 Hay una decisión
@@ -501,7 +501,7 @@ export default function Home() {
             <p className="text-center text-sm text-muted">
               {thinking
                 ? "Analizando tu situacion y armando la pantalla."
-                : "Escribe arriba lo que quieres resolver y el asesor arma la pantalla."}
+                : "Escribe arriba lo que quieres resolver y Tu rumbo Banorte arma la pantalla."}
             </p>
           )}
         </div>

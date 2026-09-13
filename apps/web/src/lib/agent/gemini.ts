@@ -5,7 +5,7 @@
  * las formas minimas que usamos en vez de importar sus tipos internos. El
  * unico import de valor es GoogleGenAI.
  */
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, type FunctionDeclaration } from "@google/genai";
 import type { McpSession, ToolResult } from "./mcp";
 
 /**
@@ -154,7 +154,7 @@ export async function generateJson(prompt: string, systemInstruction: string): P
   });
 }
 
-const REASONER_SYSTEM = `Eres el cerebro de un asesor financiero del banco Banorte, dentro de la banca digital.
+const REASONER_SYSTEM = `Eres el cerebro de Tu rumbo Banorte, la asesoria financiera del banco Banorte dentro de la banca digital.
 
 Tu trabajo en este paso es ENTENDER la situacion, no redactar la respuesta ni
 disenar la pantalla. Para eso llamas a las herramientas disponibles.
@@ -197,7 +197,7 @@ Reglas que no se negocian:
   pregunta cuando te falte un dato que de verdad cambie la recomendacion.
 - Si la consulta resulta ser de otro dominio, NO llames herramientas: no hay
   cifra que traer. Di en una linea que se sale del dominio y de que si trata
-  este asesor; el paso que dibuja la pantalla ya sabe que hacer con eso.
+  Tu rumbo Banorte; el paso que dibuja la pantalla ya sabe que hacer con eso.
 
 Cuando ya tengas los datos suficientes, responde en texto plano con un resumen
 breve de la situacion y de las posibilidades reales que ves. Ese resumen lo
@@ -257,7 +257,9 @@ export async function reason(
       config: {
         systemInstruction: REASONER_SYSTEM,
         temperature: 0.3,
-        tools: [{ functionDeclarations: mcp.declarations }],
+        // Cast solo de tipos: el SDK tipa `type` con su enum, pero la API acepta
+        // los nombres en minusculas que genera el JSON Schema de MCP.
+        tools: [{ functionDeclarations: mcp.declarations as unknown as FunctionDeclaration[] }],
       },
     });
 

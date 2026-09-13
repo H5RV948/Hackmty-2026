@@ -5,7 +5,9 @@
  * Si falla, ciclo de reparacion con el error, maximo 2 intentos, luego fallback.
  */
 import { z } from "zod";
-import catalog from "@banorte/catalog/banorte-catalog.json";
+// `with { type: "json" }` lo exige Node al importar JSON (lo usa `pnpm test`);
+// Next lo acepta igual.
+import catalog from "@banorte/catalog/banorte-catalog.json" with { type: "json" };
 import { A2UI_VERSION, type A2UIMessage } from "./types.ts";
 
 type DefinicionCatalogo = {

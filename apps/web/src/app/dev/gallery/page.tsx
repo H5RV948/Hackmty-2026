@@ -183,7 +183,7 @@ const examples: SurfaceState[] = [
         component: "OutOfScopeCard",
         titulo: "Eso se sale de lo que puedo resolver",
         mensaje:
-          'Lamentablemente no puedo responder "como va a estar el clima manana". Soy el asesor financiero de Banorte y solo trabajo con tu deuda de tarjeta de credito y el credito al que puedes acceder. Esto si lo hago contigo:',
+          'Lamentablemente no puedo responder "como va a estar el clima manana". Soy Tu rumbo Banorte y solo trabajo con tu deuda de tarjeta de credito y el credito al que puedes acceder. Esto si lo hago contigo:',
         sugerencias: CAPACIDADES.map((c) => ({ ...c })),
         consultaOriginal: "como va a estar el clima manana",
         action: { event: { name: "sugerencia_elegida" } },
@@ -312,26 +312,6 @@ const examples: SurfaceState[] = [
           { mes: "Jun", ingreso: 27365, gasto: 15686 },
           { mes: "Jul", ingreso: 27365, gasto: 18210 },
           { mes: "Ago", ingreso: 28100, gasto: 16950 },
-        ],
-      },
-    },
-    dataModel: {},
-  },
-  {
-    surfaceId: "g-gasto",
-    catalogId: "gallery",
-    title: "SpendingBreakdown — gasto por categoria",
-    root: "gasto",
-    components: {
-      gasto: {
-        id: "gasto",
-        component: "SpendingBreakdown",
-        titulo: "En que se va tu dinero",
-        categorias: [
-          { nombre: "Vivienda", monto: 6500 },
-          { nombre: "Comida", monto: 4200 },
-          { nombre: "Transporte", monto: 2300 },
-          { nombre: "Tarjeta", monto: 2686 },
         ],
       },
     },

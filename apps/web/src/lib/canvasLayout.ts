@@ -55,11 +55,8 @@ const ANCHO_PREFERIDO: Record<string, number> = {
   CardRanking: 6,
   CardShowcase: 6,
   NextSteps: 6,
-  FinancialHealthCard: 6,
   DebtSimulator: 6,
   OptionComparator: 6,
-  SpendingBreakdown: 6,
-  OpportunityGrid: 6,
   CashflowChart: 6,
   BarChart: 6,
   DonutChart: 6,
@@ -77,7 +74,6 @@ const ANCHO_PREFERIDO: Record<string, number> = {
 
   // Un dato suelto no merece media pantalla.
   Text: 4,
-  Stat: 4,
 };
 
 export function anchoPreferido(componente: string | undefined): number {

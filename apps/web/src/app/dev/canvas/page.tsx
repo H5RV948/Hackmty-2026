@@ -47,17 +47,6 @@ const RANKING = {
   ],
 };
 
-const SALUD = {
-  component: "FinancialHealthCard",
-  titulo: "Asi se ve tu mes, Fernando",
-  lectura: "Tu ingreso alcanza para cubrir el gasto fijo, pero la tarjeta se lleva casi todo lo que sobra.",
-  metricas: [
-    { label: "Ingreso", value: "$2,573", tone: "neutral" },
-    { label: "Gasto fijo", value: "$1,910", tone: "warning" },
-    { label: "Saldo tarjeta", value: "$16,525", tone: "critical" },
-  ],
-};
-
 const SIMULADOR = {
   component: "DebtSimulator",
   saldo: 16525,
@@ -199,12 +188,12 @@ const TABLEROS: Record<string, SurfaceState[]> = {
     surface("s2", "Tarjetas recomendadas", RANKING),
   ],
   "Deuda: dos de media fila": [
-    surface("s1", "Tu situacion", SALUD),
+    surface("s1", "Tu situacion", TITULAR),
     surface("s2", "Simulador", SIMULADOR),
   ],
   "Mezcla: alturas muy distintas": [
     surface("s1", "Evaluacion de riesgo", RIESGO),
-    surface("s2", "Tu situacion", SALUD),
+    surface("s2", "Tu situacion", TITULAR),
     surface("s3", "Simulador", SIMULADOR),
     surface("s4", "Comparador", COMPARADOR),
   ],

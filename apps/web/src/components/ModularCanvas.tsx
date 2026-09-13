@@ -192,7 +192,7 @@ export function ModularCanvas({
     return (
       <div className="rounded-xl border border-dashed border-line p-10 text-center">
         <p className="text-sm text-muted">
-          Escribe lo que quieres resolver y el asesor arma la pantalla.
+          Escribe lo que quieres resolver y Tu rumbo Banorte arma la pantalla.
         </p>
       </div>
     );

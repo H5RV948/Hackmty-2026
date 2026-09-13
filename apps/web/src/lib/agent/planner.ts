@@ -24,7 +24,7 @@ import type { Reasoning } from "./gemini";
 
 const MAX_REPAIRS = 2;
 
-const PLANNER_SYSTEM = `Disenas la pantalla de un asesor financiero de Banorte emitiendo mensajes A2UI v0.9.1.
+const PLANNER_SYSTEM = `Disenas la pantalla de Tu rumbo Banorte, la asesoria financiera de Banorte, emitiendo mensajes A2UI v0.9.1.
 
 Respondes SIEMPRE con un objeto JSON: { "messages": [ ... ] } y nada mas.
 
@@ -90,8 +90,6 @@ FORMA EXACTA DE action (el error mas comun, leelo dos veces):
 
 FORMA DE LAS PROPS DE ARREGLO (los widgets las leen asi, con numeros sin
 formato y sin simbolo de peso; el formato lo pone la UI):
-- FinancialHealthCard.metricas: [{ "label": "...", "value": "$18,400", "tone": "neutral|positive|warning|critical" }]
-- OpportunityGrid.opciones:     [{ "id": "...", "titulo": "...", "porQue": "...", "impactoEstimado": "..." }]
 - OptionComparator.opciones:    [{ "id": "...", "nombre": "...", "pagoMensual": 4832, "costoTotal": 115977, "plazoMeses": 24, "ventaja": "...", "desventaja": "..." }]
 - ActionPlan.pasos:             [{ "titulo": "...", "detalle": "...", "requiereConfirmacion": true }]
 - ExplorationCard.opciones:     [{ "id": "...", "label": "..." }]  (y "permiteOtro": true para dejar texto libre)
@@ -232,7 +230,7 @@ CUANDO NO TENGAS CLARO QUE QUIERE — PREGUNTA, NO ADIVINES:
 CUANDO LA CONSULTA NO SEA DE ESTE DOMINIO — OutOfScopeCard, Y NADA MAS:
   Un filtro previo ya rechazo los saludos y los temas obvios antes de llegar a
   ti, asi que aqui solo caen los casos raros: la consulta que pasa por
-  financiera pero pide algo que este asesor no hace (seguros, inversiones,
+  financiera pero pide algo que Tu rumbo Banorte no hace (seguros, inversiones,
   tramites, temas ajenos disfrazados de pregunta larga).
 
   Si es uno de esos, tu turno completo es UNA surface con UN OutOfScopeCard:
@@ -365,8 +363,8 @@ reintento completo, y a los tres la pantalla sale incompleta:
   [ ] "root" es el id de un componente de ESE mismo mensaje.
   [ ] Toda "action" va envuelta en "event".
   [ ] Cada componente trae sus props OBLIGATORIAS. Se olvida "titulo" todo el
-      tiempo: CardRanking, CardShowcase, ProductPortfolio, OptionComparator y
-      FinancialHealthCard lo exigen, y sin el se rechaza el mensaje entero.
+      tiempo: CardRanking, CardShowcase, ProductPortfolio y OptionComparator
+      lo exigen, y sin el se rechaza el mensaje entero.
   [ ] Los arreglos usan las claves exactas de la lista de arriba, no las de
       otro widget parecido.
   [ ] La primera surface es HeadlineVerdict — o RiskAlert y luego
@@ -678,8 +676,8 @@ function revisarReglas(messages: A2UIMessage[], intent: string): string[] {
    * fallo: no hay error en ningun log, solo una pantalla a medias.
    *
    * Pasa de verdad y es predecible: el modelo arrastra las claves del widget
-   * mas parecido que ya conoce. A ProductPortfolio le mandaba el {label, value}
-   * de Stat, y a NextSteps el {titulo, detalle} de ActionPlan.
+   * mas parecido que ya conoce. A ProductPortfolio le mandaba un {label, value},
+   * y a NextSteps el {titulo, detalle} de ActionPlan.
    */
   const FORMAS: Record<string, { prop: string; claves: string[] }> = {
     ProductPortfolio: { prop: "productos", claves: ["id", "tipo", "familia"] },
@@ -736,7 +734,7 @@ function revisarReglas(messages: A2UIMessage[], intent: string): string[] {
       for (const paso of c.pasos as { texto?: unknown }[]) {
         if (typeof paso?.texto === "string" && FUERA_DEL_DOMINIO.test(paso.texto)) {
           errores.push(
-            `El paso "${paso.texto}" de ${c.id} propone algo que este asesor NO resuelve. Si el usuario lo pica, la pantalla siguiente le dice que no puedes ayudarlo: un callejon sin salida que le pusimos nosotros. Cambialo por una consulta de tarjetas, creditos o prestamos.`,
+            `El paso "${paso.texto}" de ${c.id} propone algo que Tu rumbo Banorte NO resuelve. Si el usuario lo pica, la pantalla siguiente le dice que no puedes ayudarlo: un callejon sin salida que le pusimos nosotros. Cambialo por una consulta de tarjetas, creditos o prestamos.`,
           );
         }
       }
@@ -768,7 +766,7 @@ function revisarReglas(messages: A2UIMessage[], intent: string): string[] {
       );
     }
 
-    const GRAFICAS = ["BarChart", "DonutChart", "LineChart", "ProgressBars", "CardRanking", "DebtSimulator", "SpendingBreakdown", "CashflowChart"];
+    const GRAFICAS = ["BarChart", "DonutChart", "LineChart", "ProgressBars", "CardRanking", "DebtSimulator", "CashflowChart"];
     if (!GRAFICAS.some((g) => usados.has(g))) {
       errores.push(
         "El tablero no tiene ninguna grafica. Agrega al menos una —BarChart para comparar cantidades, DonutChart para partes de un todo— con cifras de las tools. Una pantalla de puras tarjetas de texto es justo lo que no queremos.",

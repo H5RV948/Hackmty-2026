@@ -26,7 +26,7 @@ const montserrat = Montserrat({
 });
 
 export const metadata: Metadata = {
-  title: "Asesor financiero",
+  title: "Tu rumbo Banorte",
   description: "Interfaz que el agente construye en tiempo real",
 };
 

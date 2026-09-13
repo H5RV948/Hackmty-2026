@@ -124,7 +124,7 @@ function copia(motivo: "charla" | "otro-tema", consulta: string) {
     titulo: "Eso se sale de lo que puedo resolver",
     mensaje: `Lamentablemente no puedo responder "${citar(
       consulta,
-    )}". Soy el asesor financiero de Banorte y solo trabajo con tu deuda de tarjeta de credito y el credito al que puedes acceder. Esto si lo hago contigo:`,
+    )}". Soy Tu rumbo Banorte y solo trabajo con tu deuda de tarjeta de credito y el credito al que puedes acceder. Esto si lo hago contigo:`,
   };
 }
 

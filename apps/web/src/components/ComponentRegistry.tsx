@@ -11,12 +11,7 @@ import type { WidgetProps } from "./widgets";
 
 export const ComponentRegistry: Record<string, ComponentType<WidgetProps>> = {
   Text: W.Text,
-  Button: W.Button,
-  Stat: W.Stat,
-  FinancialHealthCard: W.FinancialHealthCard,
   CashflowChart: W.CashflowChart,
-  SpendingBreakdown: W.SpendingBreakdown,
-  OpportunityGrid: W.OpportunityGrid,
   ExplorationCard: W.ExplorationCard,
   UnderstandingSummary: W.UnderstandingSummary,
   DebtSimulator: W.DebtSimulator,
