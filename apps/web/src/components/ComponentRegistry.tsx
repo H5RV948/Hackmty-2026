@@ -3,8 +3,7 @@
 /**
  * Tabla de registro: tipo de componente A2UI -> componente React.
  *
- * Debe cubrir exactamente los tipos de banorte-catalog.json. La prueba de
- * `registry.test.ts` falla si hay un tipo en el catalogo sin implementacion.
+ * Debe cubrir exactamente los tipos de banorte-catalog.json.
  */
 import type { ComponentType } from "react";
 import * as W from "./widgets";
@@ -35,7 +34,3 @@ export const ComponentRegistry: Record<string, ComponentType<WidgetProps>> = {
   LineChart: W.LineChart,
   ProgressBars: W.ProgressBars,
 };
-
-export function isRegistered(type: string): boolean {
-  return type in ComponentRegistry;
-}

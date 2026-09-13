@@ -30,5 +30,4 @@ Lee `docs/` antes de tocar codigo.
 docker compose up -d          # levantar en segundo plano
 docker compose logs -f web    # ver logs del frontend
 docker compose down           # apagar
-docker compose down -v        # apagar y borrar el volumen de Postgres
 ```
