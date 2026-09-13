@@ -291,7 +291,7 @@
       }
     },
     "CardShowcase": {
-      "description": "Vitrina de tarjetas de credito. Muestra SOLO la imagen del plastico; al pasar el cursor aparecen los beneficios y el boton Ver mas. Usala cuando el usuario pregunte por tarjetas.",
+      "description": "Vitrina de tarjetas de credito. Muestra SOLO la imagen del plastico; al pasar el cursor aparecen los beneficios y el boton Ver mas. Usala cuando el usuario pregunte por tarjetas. Lista TODAS las que salgan elegibles en get_eligible_cards, no solo tres.",
       "props": {
         "titulo": {
           "type": "string",
@@ -306,11 +306,16 @@
         "action": {
           "type": "action",
           "required": true
+        },
+        "destacadaId": {
+          "type": "string",
+          "bindable": true,
+          "description": "id de la tarjeta que viene con recomendada:true en get_eligible_cards. La UI le pone marco rojo y un sello 'La que mas te conviene'. No la elijas tu: copia la que marco la tool."
         }
       }
     },
     "CardRanking": {
-      "description": "Grafica de barras horizontales con las tarjetas mas recomendadas para este cliente, ordenadas de mayor a menor. Acompania siempre a CardShowcase. Exactamente tres.",
+      "description": "Grafica de barras horizontales con las tarjetas mas recomendadas para este cliente, ordenadas de mayor a menor. Acompania siempre a CardShowcase. Tres a cinco barras: es el resumen del ranking, no el catalogo completo.",
       "props": {
         "titulo": {
           "type": "string",
@@ -329,6 +334,41 @@
         },
         "action": {
           "type": "action"
+        },
+        "destacadaId": {
+          "type": "string",
+          "bindable": true,
+          "description": "id de la tarjeta recomendada. Se marca con un sello junto a su barra."
+        }
+      }
+    },
+    "RiskAlert": {
+      "phase": "analizar",
+      "description": "Aviso de riesgo de endeudamiento. En nivel 'alto' se pinta en rojo y le dice al usuario que NO conviene sacar mas credito ahora. Copia nivel, titulo, mensaje y senales tal cual de alertaDeuda en get_eligible_cards: es una evaluacion del banco, no tu opinion. Cuando alertaDeuda.desaconsejaNuevoCredito sea true, esta surface va ARRIBA de todo.",
+      "props": {
+        "nivel": {
+          "type": "enum",
+          "values": [
+            "ok",
+            "precaucion",
+            "alto"
+          ],
+          "required": true
+        },
+        "titulo": {
+          "type": "string",
+          "required": true,
+          "bindable": true
+        },
+        "mensaje": {
+          "type": "string",
+          "required": true,
+          "bindable": true
+        },
+        "senales": {
+          "type": "array<string>",
+          "bindable": true,
+          "description": "Cifras concretas del perfil que sostienen la alerta. Copialas de la tool."
         }
       }
     }

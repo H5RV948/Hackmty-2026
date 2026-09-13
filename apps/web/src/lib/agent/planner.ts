@@ -105,7 +105,12 @@ formato y sin simbolo de peso; el formato lo pone la UI):
   solo, los otros chips salen sin numeros. No uses "plazos", "cat" ni
   "pagoMensual" sueltos: quedaron como legado.
 - CardShowcase.tarjetas:        [{ "id": "...", "nombre": "Clásica", "imagen": "/tarjetas/clasica.png", "bullets": ["...","..."], "cat": 121.4, "anualidad": 695, "fuente": "https://...", "fechaVerificacion": "2026-09-12" }]
+  y ademas "destacadaId": "<id de la que trae recomendada:true>"
 - CardRanking.barras:           [{ "id": "...", "nombre": "Clásica", "puntaje": 82, "porQue": "Sin anualidad el primer anio y CAT de 121.4%." }]
+  y ademas "destacadaId": el mismo id que en CardShowcase
+- RiskAlert:                    "nivel" es "ok" | "precaucion" | "alto", "titulo"
+  y "mensaje" son texto, "senales" es un arreglo de textos. Los cuatro se copian
+  de alertaDeuda tal cual: es una evaluacion del banco, no tu opinion.
 - Copy de la UI en espanol, claro, sin jerga bancaria.
 - Los datos de herramienta traen el NOMBRE del cliente. Usalo: dirigete a la
   persona por su nombre de pila al menos una vez, en el titulo o en la lectura
@@ -149,28 +154,48 @@ CUANDO NO TENGAS CLARO QUE QUIERE — PREGUNTA, NO ADIVINES:
   No abuses: si con una lectura razonable puedes dar una pantalla util, dala.
   Preguntar dos turnos seguidos es peor que asumir bien una vez.
 
-CUANDO EL USUARIO PREGUNTE POR TARJETAS — DOS COMPONENTES, SIEMPRE LOS DOS:
-  Si mandas uno sin el otro el plan se rechaza completo. No es una sugerencia.
-  Llama get_card_catalog y emite:
-  1. CardRanking con EXACTAMENTE TRES tarjetas, de mayor a menor conveniencia
-     para ESTE cliente. El puntaje va de 0 a 100 y lo decides tu comparando su
-     ingreso, su uso de linea y su score contra el ingreso minimo, el CAT y la
-     anualidad de cada producto. En "porQue" explica en una linea usando una
-     cifra concreta de la tool.
-  2. CardShowcase con esas mismas tres (o mas si el usuario pidio ver todas).
-     nombre, imagen, bullets, cat, anualidad, fuente y fechaVerificacion se
-     copian TAL CUAL de get_card_catalog. La imagen nunca te la inventes: si la
-     tool no trae ruta, omite esa tarjeta.
+CUANDO EL USUARIO PREGUNTE POR TARJETAS — USA get_eligible_cards:
+  Esa tool ya hizo el trabajo dificil: recibe el clienteId y devuelve las
+  tarjetas a las que SI califica (ordenadas, con la mejor marcada
+  recomendada:true), las que no le tocan con su motivo, y una alerta de
+  endeudamiento. NO uses get_card_catalog para esto y NO decidas tu quien
+  califica: elegibilidad y puntaje son calculo del banco, no juicio tuyo.
 
-  El puntaje es tu juicio y esta bien que lo sea; el CAT, la anualidad y el
-  ingreso minimo NO son tu juicio y tienen que venir de la tool sin retocar.
+  Emite estas surfaces, en este orden:
 
-  Si tu conclusion es que a esta persona NO le conviene una tarjeta nueva
-  todavia —porque trae la linea al tope, score bajo o pagos atrasados—, esa es
-  una respuesta valida y correcta. Pero DIBUJALA: un FinancialHealthCard con el
-  porque y sus cifras, y el CardRanking con las tres que menos mal le quedarian
-  y puntajes bajos que lo digan. Jamas cierres una consulta con puro texto: el
-  producto es un tablero.
+  1. RiskAlert — SIEMPRE, y va primero en el layout (y: 0, w: 12, h: 2; con
+     muchas senales, h: 3). Copia nivel, titulo, mensaje y senales TAL CUAL de
+     alertaDeuda. No suavices el texto ni le quites senales.
+
+  2. CardRanking con las TRES a CINCO mejores de "elegibles", en el orden en
+     que vienen. "puntaje" se copia de la tool. "destacadaId" es el id de la
+     que trae recomendada:true. En "porQue" explicas en una linea usando una
+     cifra concreta (su CAT, su anualidad, su ingreso minimo) — ahi si
+     escribes tu.
+
+  3. CardShowcase con TODAS las elegibles, no solo tres: el usuario pidio ver
+     a que puede acceder. Mismo "destacadaId". nombre, imagen, bullets, cat,
+     anualidad, fuente y fechaVerificacion se copian TAL CUAL. La imagen nunca
+     te la inventes: si la tool no trae ruta, omite esa tarjeta.
+     Layout: w: 12 y h: 5 (son varias filas de plasticos).
+
+  4. Si "noElegibles" no viene vacio, un Text (variant "caption") que diga en
+     una linea cuantas quedaron fuera y por que — casi siempre es el ingreso
+     minimo. Es para que el usuario sepa que le falta, no para taparlo.
+
+  El id de cada tarjeta en CardRanking y CardShowcase es el campo "id" que
+  devuelve la tool. Tienen que coincidir con destacadaId o el sello no aparece.
+
+  SI alertaDeuda.desaconsejaNuevoCredito ES TRUE:
+    Cambia el tono de toda la pantalla. Sigues mostrando para que califica
+    —tiene derecho a saberlo— pero los titulos dejan de vender: algo como
+    "Para estas calificas, aunque hoy no te convenga contratar". Nada de "te
+    recomendamos", nada de urgencia, ningun boton que empuje a contratar.
+    Ademas agrega un DebtSimulator con la reestructura de su saldo: si le vas a
+    decir que baje su deuda, muestrale con que numeros.
+
+  Jamas cierres una consulta de tarjetas con puro texto: el producto es un
+  tablero.
 
   (Un ExplorationCard de desambiguacion NO es "puro texto": es un widget y es
   una respuesta valida por si sola. Esta regla habla de cerrar con un parrafo.)
@@ -398,6 +423,18 @@ function revisarReglas(messages: A2UIMessage[], intent: string): string[] {
   if (preguntaronPorTarjetas && !usados.has("CardShowcase") && !usados.has("CardRanking")) {
     errores.push(
       "El usuario pregunto por tarjetas y no emitiste ni CardRanking ni CardShowcase. Aunque tu conclusion sea que no le conviene ninguna todavia, dibujala: CardRanking con las tres menos malas y puntajes bajos que lo digan, y CardShowcase con esas mismas. No cierres una consulta de tarjetas sin ensenar tarjetas.",
+    );
+  }
+
+  /*
+   * Tarjetas sin alerta de riesgo: no se muestra un catalogo de credito sin
+   * decir en que situacion esta la persona. `get_eligible_cards` siempre
+   * devuelve `alertaDeuda`, asi que omitirla es que el modelo la ignoro, no que
+   * no existiera. Es la regla con mas peso etico del planner.
+   */
+  if ((usados.has("CardShowcase") || usados.has("CardRanking")) && !usados.has("RiskAlert")) {
+    errores.push(
+      "Mostraste tarjetas sin RiskAlert. get_eligible_cards SIEMPRE devuelve alertaDeuda: emite un RiskAlert con su nivel, titulo, mensaje y senales tal cual, y ponlo primero en el layout. No se le ensena un catalogo de credito a alguien sin decirle como esta parado.",
     );
   }
 

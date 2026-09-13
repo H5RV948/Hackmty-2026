@@ -487,7 +487,7 @@ type FichaTarjeta = {
  * parpadeo, y en touch —donde no hay hover— el detalle queda visible siempre
  * gracias a la variante `max-lg:opacity-100`.
  */
-export function CardShowcase({ titulo, tarjetas, emit, action }: WidgetProps) {
+export function CardShowcase({ titulo, tarjetas, destacadaId, emit, action }: WidgetProps) {
   const lista = Array.isArray(tarjetas) ? (tarjetas as FichaTarjeta[]) : [];
   const name =
     (action as { event?: { name?: string } } | undefined)?.event?.name ?? "card_selected";
@@ -497,11 +497,21 @@ export function CardShowcase({ titulo, tarjetas, emit, action }: WidgetProps) {
       <h3 className="text-base font-semibold text-ink">{String(titulo ?? "")}</h3>
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {lista.map((t) => (
+        {lista.map((t) => {
+          // La destacada la elige la tool (recomendada:true), no el modelo.
+          const destacada = destacadaId !== undefined && t.id === destacadaId;
+          return (
           <article
             key={t.id}
-            className="group relative overflow-hidden rounded-xl border border-line bg-surface p-4"
+            className={`group relative overflow-hidden rounded-xl border bg-surface p-4 ${
+              destacada ? "border-brand ring-2 ring-brand/30" : "border-line"
+            }`}
           >
+            {destacada && (
+              <span className="absolute left-0 top-0 z-10 rounded-br-lg bg-brand px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
+                La que mas te conviene
+              </span>
+            )}
             <img
               src={t.imagen}
               alt={t.nombre}
@@ -545,7 +555,8 @@ export function CardShowcase({ titulo, tarjetas, emit, action }: WidgetProps) {
               )}
             </div>
           </article>
-        ))}
+          );
+        })}
       </div>
     </section>
   );
@@ -558,7 +569,7 @@ export function CardShowcase({ titulo, tarjetas, emit, action }: WidgetProps) {
  * comparacion de magnitudes en una sola dimension, y para eso la longitud es la
  * codificacion que el ojo compara mejor.
  */
-export function CardRanking({ titulo, criterio, barras }: WidgetProps) {
+export function CardRanking({ titulo, criterio, barras, destacadaId }: WidgetProps) {
   const lista = Array.isArray(barras)
     ? (barras as { id: string; nombre: string; puntaje: number; porQue?: string }[])
     : [];
@@ -577,6 +588,11 @@ export function CardRanking({ titulo, criterio, barras }: WidgetProps) {
               <div className="flex items-baseline justify-between gap-3">
                 <span className="text-sm font-medium text-ink">
                   <span className="text-muted">{i + 1}.</span> {b.nombre}
+                  {destacadaId !== undefined && b.id === destacadaId && (
+                    <span className="ml-2 rounded-full bg-brand px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+                      Recomendada
+                    </span>
+                  )}
                 </span>
                 <span className="tnum text-xs text-muted">{Math.round(Number(b.puntaje) || 0)}</span>
               </div>
@@ -595,6 +611,90 @@ export function CardRanking({ titulo, criterio, barras }: WidgetProps) {
           );
         })}
       </ol>
+    </section>
+  );
+}
+
+/* ---------------------------------------------------------------- */
+/* Riesgo                                                            */
+/* ---------------------------------------------------------------- */
+
+/**
+ * Aviso de endeudamiento.
+ *
+ * El nivel NO lo decide el modelo: lo calcula `evaluarRiesgoDeuda` en el MCP a
+ * partir de cifras del perfil (uso de linea, pagos atrasados, creditos
+ * vencidos). Es la parte de la pantalla donde el banco asume una
+ * responsabilidad, y no puede depender de que el modelo se sienta prudente ese
+ * dia.
+ *
+ * En "alto" se pinta en rojo pleno y dice explicitamente que no conviene sacar
+ * mas credito: es el unico lugar del producto donde el asesor desaconseja algo,
+ * y tiene que leerse distinto a todo lo demas.
+ */
+export function RiskAlert({ nivel, titulo, mensaje, senales }: WidgetProps) {
+  const lista = Array.isArray(senales) ? (senales as string[]) : [];
+  const grado = String(nivel ?? "ok");
+
+  const estilos: Record<string, { caja: string; icono: string; punto: string }> = {
+    alto: {
+      caja: "border-brand bg-brand-soft",
+      icono: "bg-brand text-white",
+      punto: "bg-brand",
+    },
+    precaucion: {
+      caja: "border-warning/40 bg-warning/5",
+      icono: "bg-warning text-white",
+      punto: "bg-warning",
+    },
+    ok: {
+      caja: "border-line bg-surface",
+      icono: "bg-positive text-white",
+      punto: "bg-positive",
+    },
+  };
+  const estilo = estilos[grado] ?? estilos.ok;
+
+  return (
+    <section
+      role={grado === "alto" ? "alert" : undefined}
+      className={`flex gap-4 rounded-xl border p-4 ${estilo.caja}`}
+    >
+      <span
+        aria-hidden
+        className={`grid h-9 w-9 shrink-0 place-items-center rounded-full ${estilo.icono}`}
+      >
+        {grado === "ok" ? (
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        ) : (
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <path d="M12 8v5" strokeLinecap="round" />
+            <circle cx="12" cy="16.5" r="1.1" fill="currentColor" stroke="none" />
+          </svg>
+        )}
+      </span>
+
+      <div className="min-w-0">
+        <h3 className={`text-base font-semibold ${grado === "alto" ? "text-brand" : "text-ink"}`}>
+          {String(titulo ?? "")}
+        </h3>
+        <p className="mt-1 max-w-[62ch] text-sm leading-relaxed text-muted">
+          {String(mensaje ?? "")}
+        </p>
+
+        {lista.length > 0 && (
+          <ul className="mt-3 space-y-1">
+            {lista.map((s) => (
+              <li key={s} className="flex gap-2 text-xs leading-relaxed text-muted">
+                <span aria-hidden className={`mt-[6px] h-1 w-1 shrink-0 rounded-full ${estilo.punto}`} />
+                {s}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </section>
   );
 }

@@ -25,6 +25,7 @@ import {
   tarjetasCredito,
 } from "./data.js";
 import { simularReestructura } from "./finance.js";
+import { evaluarElegibilidad, evaluarRiesgoDeuda, puntuar } from "./eligibility.js";
 import {
   emptyUnderstanding,
   isReadyToSummarize,
@@ -173,6 +174,74 @@ function buildServer(): McpServer {
         opciones: simularReestructura(base, plazosReestructura),
         nota: "Los plazos y su CAT son la oferta supuesta del banco para el reto, no una oferta real.",
         synthetic: SYNTHETIC,
+      });
+    },
+  );
+
+  server.registerTool(
+    "get_eligible_cards",
+    {
+      description:
+        "[read] LA TOOL PARA RECOMENDAR TARJETAS. Para un clienteId devuelve: (1) las tarjetas a las que SI califica, ya ordenadas por conveniencia y con la mejor marcada con recomendada:true, (2) las que no le tocan y por que, y (3) una alerta de endeudamiento. La elegibilidad y el puntaje los calcula el banco, no tu: copialos tal cual y limitate a explicarlos. Si alertaDeuda.desaconsejaNuevoCredito es true, la pantalla NO debe empujar contratacion.",
+      inputSchema: {
+        clienteId: z
+          .string()
+          .describe("Obligatorio. El mismo de get_financial_profile."),
+        incluirNoElegibles: z
+          .boolean()
+          .optional()
+          .describe("Por defecto true: sirve para explicarle al usuario que le falta."),
+      },
+    },
+    async ({ clienteId, incluirNoElegibles }) => {
+      const cliente = getCliente(clienteId);
+      if (!cliente) {
+        return fail(
+          `No existe el cliente "${clienteId}". Pasa el mismo id que te dio get_financial_profile.`,
+        );
+      }
+
+      const evaluadas = tarjetasCredito.map((producto) => {
+        const elegibilidad = evaluarElegibilidad(cliente, producto);
+        const { puntaje, factores } = puntuar(cliente, producto);
+        return {
+          id: producto.producto,
+          nombre: producto.nombreDisplay,
+          imagen: producto.imagen,
+          bullets: producto.bullets,
+          cat: producto.catPromedio,
+          anualidad: producto.comisionAnual,
+          ingresoMinimo: producto.ingresoMinimo,
+          segmento: producto.segmento,
+          perfilObjetivo: producto.perfilObjetivo,
+          requisitos: producto.requisitos,
+          fuente: producto.fuente,
+          fechaVerificacion: producto.fechaVerificacion,
+          elegible: elegibilidad.elegible,
+          bloqueos: elegibilidad.bloqueos,
+          cumple: elegibilidad.cumple,
+          puntaje,
+          factoresPuntaje: factores,
+        };
+      });
+
+      const elegibles = evaluadas
+        .filter((t) => t.elegible)
+        .sort((a, b) => b.puntaje - a.puntaje)
+        .map((t, i) => ({ ...t, recomendada: i === 0 }));
+
+      const noElegibles = incluirNoElegibles === false ? [] : evaluadas.filter((t) => !t.elegible);
+      const alertaDeuda = evaluarRiesgoDeuda(cliente);
+
+      return ok({
+        clienteId: cliente.id,
+        nombre: cliente.nombre,
+        totalEvaluadas: evaluadas.length,
+        elegibles,
+        noElegibles,
+        alertaDeuda,
+        nota: "Elegibilidad y puntaje calculados por el banco a partir de los requisitos publicados. El puntaje es un criterio de conveniencia del asesor, no una preaprobacion.",
+        synthetic: false,
       });
     },
   );

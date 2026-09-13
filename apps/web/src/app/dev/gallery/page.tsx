@@ -30,6 +30,124 @@ const examples: SurfaceState[] = [
     },
     dataModel: {},
   },
+  // Los tres niveles de RiskAlert juntos: la diferencia entre ellos es el
+  // punto del componente, y verlos por separado no dice nada.
+  {
+    surfaceId: "g-riesgo-alto",
+    catalogId: "gallery",
+    title: "RiskAlert — nivel alto (desaconseja credito nuevo)",
+    root: "alerta",
+    components: {
+      alerta: {
+        id: "alerta",
+        component: "RiskAlert",
+        nivel: "alto",
+        titulo: "Antes de pedir otra tarjeta, conviene bajar lo que ya debes",
+        mensaje:
+          "Con tu situacion actual, sumar una linea nueva encarece el problema en vez de resolverlo. Lo que mas te ayuda hoy es ordenar la deuda que ya tienes.",
+        senales: [
+          "Usa el 96.4% de su linea de credito.",
+          "Su nivel de endeudamiento esta clasificado como alto.",
+          "Su clasificacion crediticia es baja.",
+        ],
+      },
+    },
+    dataModel: {},
+  },
+  {
+    surfaceId: "g-riesgo-precaucion",
+    catalogId: "gallery",
+    title: "RiskAlert — precaucion",
+    root: "alerta",
+    components: {
+      alerta: {
+        id: "alerta",
+        component: "RiskAlert",
+        nivel: "precaucion",
+        titulo: "Puedes pedirla, pero vale la pena verlo con calma",
+        mensaje:
+          "Calificas para varios productos, aunque tu nivel de deuda ya pesa. Si contratas, que sea por un beneficio concreto y no por la linea extra.",
+        senales: ["Tuvo 2 pagos atrasados en los ultimos 12 meses."],
+      },
+    },
+    dataModel: {},
+  },
+  {
+    surfaceId: "g-riesgo-ok",
+    catalogId: "gallery",
+    title: "RiskAlert — ok",
+    root: "alerta",
+    components: {
+      alerta: {
+        id: "alerta",
+        component: "RiskAlert",
+        nivel: "ok",
+        titulo: "Tu situacion da espacio para una tarjeta nueva",
+        mensaje: "Tus indicadores de deuda estan en rango.",
+        senales: [],
+      },
+    },
+    dataModel: {},
+  },
+  {
+    surfaceId: "g-vitrina",
+    catalogId: "gallery",
+    title: "CardShowcase — con destacadaId",
+    root: "vitrina",
+    components: {
+      vitrina: {
+        id: "vitrina",
+        component: "CardShowcase",
+        titulo: "Tarjetas para las que calificas",
+        destacadaId: "Banorte One Up",
+        tarjetas: [
+          {
+            id: "Banorte One Up",
+            nombre: "One Up",
+            imagen: "/tarjetas/one-up.png",
+            bullets: ["Sin anualidad el primer anio.", "Recompensas en cada compra."],
+            cat: 87.8,
+            anualidad: 750,
+            fuente: "https://www.banorte.com/",
+            fechaVerificacion: "2026-09-12",
+          },
+          {
+            id: "Mujer Banorte",
+            nombre: "Mujer Banorte",
+            imagen: "/tarjetas/mujer.png",
+            bullets: ["6 meses sin intereses en salud.", "Primera anualidad sin costo."],
+            cat: 96.6,
+            anualidad: 1100,
+            fuente: "https://www.banorte.com/",
+            fechaVerificacion: "2026-09-12",
+          },
+        ],
+        action: { event: { name: "card_selected" } },
+      },
+    },
+    dataModel: {},
+  },
+  {
+    surfaceId: "g-ranking",
+    catalogId: "gallery",
+    title: "CardRanking — con destacadaId",
+    root: "ranking",
+    components: {
+      ranking: {
+        id: "ranking",
+        component: "CardRanking",
+        titulo: "Cual te conviene mas",
+        criterio: "Segun tu ingreso, tu uso de credito y el costo de cada tarjeta",
+        destacadaId: "Banorte One Up",
+        barras: [
+          { id: "Banorte One Up", nombre: "One Up", puntaje: 85, porQue: "El CAT mas bajo de las que calificas: 87.8%." },
+          { id: "Banorte Básica", nombre: "Básica", puntaje: 81, porQue: "Anualidad de $500, la mitad que las demas." },
+          { id: "Mujer Banorte", nombre: "Mujer Banorte", puntaje: 81, porQue: "Asistencias de salud y 6 MSI iniciales." },
+        ],
+      },
+    },
+    dataModel: {},
+  },
   // TODO(fase 2): un ejemplo por cada componente del catalogo.
 ];
 

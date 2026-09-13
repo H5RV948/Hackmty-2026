@@ -98,6 +98,8 @@ export type Cliente = {
   apellidoMaterno: string;
   nombreCompleto: string;
   tipoCliente: string;
+  /** "Femenino" | "Masculino" | "No aplica" | "Otro/Prefiere no decir". */
+  sexo: string;
   edad: number | null;
   ingresoMensual: number | null;
   gastosMensuales: number | null;
@@ -113,6 +115,7 @@ export type Cliente = {
   nivelEndeudamiento: string;
   nivelRiesgoCrediticio: string;
   pagosAtrasados12m: number | null;
+  tieneCreditosVencidos: boolean;
   reestructuraPrevia: boolean;
   objetivoFinanciero: string;
   productoInteres: string;
@@ -125,6 +128,7 @@ export const clientes: Cliente[] = readSeed("clientes_sintetico_con_nombres.csv"
   apellidoMaterno: r.apellido_materno,
   nombreCompleto: r.nombre_completo,
   tipoCliente: r.tipo_cliente,
+  sexo: r.sexo,
   edad: num(r.edad),
   ingresoMensual: num(r.ingreso_mensual_mxn) ?? num(r.ventas_mensuales_mxn),
   gastosMensuales: num(r.gastos_mensuales_mxn),
@@ -140,6 +144,7 @@ export const clientes: Cliente[] = readSeed("clientes_sintetico_con_nombres.csv"
   nivelEndeudamiento: r.nivel_endeudamiento,
   nivelRiesgoCrediticio: r.nivel_riesgo_crediticio,
   pagosAtrasados12m: num(r.pagos_atrasados_ultimos_12_meses),
+  tieneCreditosVencidos: bool(r.tiene_creditos_vencidos),
   reestructuraPrevia: bool(r.reestructuracion_deuda_previa),
   objetivoFinanciero: r.principal_objetivo_financiero,
   productoInteres: r.producto_interes,
@@ -239,6 +244,8 @@ export type ProductoTarjeta = {
   tipoCliente: string;
   red: string;
   ingresoMinimo: number | null;
+  /** Texto libre del CSV: "18 a 69 años 11 meses", "18+", "Mayor de edad"... */
+  edadRequisito: string;
   comisionAnual: number | null;
   catPromedio: number | null;
   tasaPromedio: number | null;
@@ -260,6 +267,7 @@ export const catalogoTarjetas: ProductoTarjeta[] = readSeed("catalogo_tarjetas.c
   tipoCliente: r.tipo_cliente,
   red: r.red,
   ingresoMinimo: num(r.ingreso_min_mxn),
+  edadRequisito: r.edad || "",
   comisionAnual: num(r.comision_admin_anual_mxn_sin_iva),
   catPromedio: num(r.cat_promedio_pct),
   tasaPromedio: num(r.tasa_promedio_pct),
