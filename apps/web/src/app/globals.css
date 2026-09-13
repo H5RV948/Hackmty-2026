@@ -10,6 +10,14 @@
   --ink: #14100f;
   --surface: #ffffff;
   --muted: #6b625f;
+  /*
+   * Gris del texto fantasma del autocompletado. Es un token y no un
+   * `text-muted/60` porque Tailwind descarta el modificador de opacidad cuando
+   * el color esta declarado como var(): la clase no se genera, el span se
+   * queda sin regla de color y hereda el --ink del cuerpo. O sea que la
+   * sugerencia se pintaba negra, indistinguible de lo que el usuario tecleo.
+   */
+  --muted-soft: #a8a09d;
   --line: #e6e1df;
   --brand: #eb0029;
   --brand-soft: #fdeef1;

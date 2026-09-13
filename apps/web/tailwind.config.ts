@@ -8,6 +8,7 @@ export default {
         ink: "var(--ink)",
         surface: "var(--surface)",
         muted: "var(--muted)",
+        "muted-soft": "var(--muted-soft)",
         line: "var(--line)",
         brand: "var(--brand)",
         "brand-soft": "var(--brand-soft)",

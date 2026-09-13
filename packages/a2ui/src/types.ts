@@ -149,7 +149,20 @@ export type ClientEvent =
       type: "canvas_layout_changed";
       items: GridItem[];
     }
-  | { type: "user_message"; text: string };
+  | {
+      type: "user_message";
+      text: string;
+      /**
+       * El usuario insiste despues de que el filtro de alcance rechazo su
+       * consulta (ver `scope.ts`). Salta el filtro y va derecho al agente.
+       *
+       * Existe porque el filtro son expresiones regulares y va a equivocarse
+       * alguna vez: sin esta bandera, una consulta legitima mal clasificada no
+       * tendria forma de llegar al agente y el usuario se quedaria picando el
+       * mismo boton esperando otro resultado.
+       */
+      forzado?: boolean;
+    };
 
 /* ------------------------------------------------------------------ */
 /* Estado del cliente                                                  */

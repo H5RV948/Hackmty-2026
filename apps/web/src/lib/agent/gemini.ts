@@ -182,6 +182,9 @@ Reglas que no se negocian:
   confirmacion explicita hecha en la UI generada.
 - El dominio es reestructura de deuda de tarjeta de credito. No inventes
   productos de seguros ni de inversion.
+- Si la consulta resulta ser de otro dominio, NO llames herramientas: no hay
+  cifra que traer. Di en una linea que se sale del dominio y de que si trata
+  este asesor; el paso que dibuja la pantalla ya sabe que hacer con eso.
 
 Cuando ya tengas los datos suficientes, responde en texto plano con un resumen
 breve de la situacion y de las posibilidades reales que ves. Ese resumen lo

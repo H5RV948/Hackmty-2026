@@ -698,3 +698,105 @@ export function RiskAlert({ nivel, titulo, mensaje, senales }: WidgetProps) {
     </section>
   );
 }
+
+/* ---------------------------------------------------------------- */
+/* Fuera de alcance                                                  */
+/* ---------------------------------------------------------------- */
+
+type Sugerencia = { id: string; texto: string; porQue: string };
+
+/**
+ * Lo que ve quien escribio "hola" o pregunto por el clima.
+ *
+ * Es la unica pantalla del producto que se genera SIN pasar por el modelo: la
+ * arma `scope.ts` en el servidor y viaja como A2UI normal (ver ahi el porque).
+ * Para el canvas es un widget mas.
+ *
+ * Decision de tono: no es un error, es una puerta. Un "no entendi tu consulta"
+ * a secas deja al usuario exactamente donde estaba —sin saber que preguntar—,
+ * que es justo el problema que esta tarjeta existe para resolver. Por eso el
+ * peso visual esta en las sugerencias y no en la negativa: la negativa es una
+ * linea, las sugerencias son botones que se pican y arrancan la consulta.
+ *
+ * Cada sugerencia manda su texto TAL CUAL como si el usuario lo hubiera
+ * tecleado (ver `page.tsx`), no un id que el agente tenga que interpretar. Asi
+ * el historial de la sesion muestra una pregunta legible y no "capacidad 3".
+ */
+export function OutOfScopeCard({
+  titulo,
+  mensaje,
+  sugerencias,
+  consultaOriginal,
+  emit,
+  action,
+}: WidgetProps) {
+  const items = Array.isArray(sugerencias) ? (sugerencias as Sugerencia[]) : [];
+  const name =
+    (action as { event?: { name?: string } } | undefined)?.event?.name ?? "sugerencia_elegida";
+  const original = typeof consultaOriginal === "string" ? consultaOriginal.trim() : "";
+
+  return (
+    <section className="space-y-4">
+      <div className="flex gap-4">
+        <span
+          aria-hidden
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-brand-soft text-brand"
+        >
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M9.5 9.5a2.6 2.6 0 1 1 3.4 2.5c-.6.2-.9.7-.9 1.3v.4" strokeLinecap="round" />
+            <circle cx="12" cy="17" r="1" fill="currentColor" stroke="none" />
+          </svg>
+        </span>
+
+        <div className="min-w-0">
+          <h2 className="text-base font-semibold text-ink">{String(titulo ?? "")}</h2>
+          <p className="mt-1 max-w-[62ch] text-sm leading-relaxed text-muted">
+            {String(mensaje ?? "")}
+          </p>
+        </div>
+      </div>
+
+      {items.length > 0 && (
+        <ul className="grid gap-2 sm:grid-cols-2">
+          {items.map((s) => (
+            <li key={s.id}>
+              {/*
+                h-full en el boton y no en el li: los botones de una fila del
+                grid tienen alturas distintas segun cuanto mida su "porQue", y
+                sin esto quedan desalineados por abajo.
+              */}
+              <button
+                type="button"
+                onClick={() => emit(name, { texto: s.texto, sugerenciaId: s.id })}
+                className="h-full w-full rounded-xl border border-line bg-surface p-4 text-left transition-colors hover:border-brand hover:bg-brand-soft focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand"
+              >
+                <p className="text-sm font-medium text-ink">{s.texto}</p>
+                <p className="mt-1 text-xs leading-relaxed text-muted">{s.porQue}</p>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {/*
+        Salida cuando el filtro se equivoco.
+        El filtro de alcance es un puñado de expresiones regulares, no un
+        clasificador: en algun momento va a rechazar una consulta legitima
+        escrita con palabras que no previmos. Este boton es lo que hace que ese
+        error cueste un clic en vez de dejar a alguien sin respuesta.
+      */}
+      {original && (
+        <div className="border-t border-line pt-3">
+          <button
+            type="button"
+            onClick={() => emit("consultar_de_todos_modos", { texto: original })}
+            className="text-xs text-muted underline decoration-line underline-offset-4 transition-colors hover:text-brand"
+          >
+            Preguntarlo de todos modos
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}

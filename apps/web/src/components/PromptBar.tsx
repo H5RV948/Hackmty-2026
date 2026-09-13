@@ -12,8 +12,12 @@
  *
  * El estado vive arriba (`value`), asi que las dos instancias muestran siempre
  * lo mismo y da igual cual este visible.
+ *
+ * Tambien vive aqui el autocompletado fantasma (ver mas abajo): las dos
+ * instancias lo calculan del mismo `value`, asi que proponen lo mismo.
  */
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { completaciones, restanteDe } from "@/lib/suggestions";
 
 type Props = {
   value: string;
@@ -51,20 +55,136 @@ export function PromptBar({ value, onChange, onSubmit, thinking, showRing, input
     return () => observador.disconnect();
   }, []);
 
+  /*
+   * Autocompletado fantasma.
+   *
+   * Por que de frase completa y no de palabra: el problema del usuario no es
+   * teclear rapido, es no saber que se le puede preguntar a esto. Completar
+   * "tarj" -> "tarjeta" no le ensena nada; completar a "Quiero pagar menos
+   * intereses de mi tarjeta de credito" le ensena el tipo de consulta que este
+   * asesor sabe convertir en un tablero.
+   *
+   * Por que en gris dentro del campo y no en una lista desplegable: la barra
+   * vive sobre el tablero y es la misma que se acopla arriba; un panel colgando
+   * taparia justo los widgets que el usuario esta leyendo para decidir su
+   * siguiente pregunta.
+   *
+   * Solo empata por PREFIJO (ver `completaciones`). Un empate a media frase no
+   * se puede pintar alineado, y una sugerencia descuadrada se lee como un bug.
+   */
+  const opciones = useMemo(() => completaciones(value), [value]);
+  const [indice, setIndice] = useState(0);
+
+  // Al cambiar lo tecleado la lista es otra: quedarse en el indice viejo
+  // apuntaria a una frase que ya no tiene que ver con lo que se escribio.
+  useEffect(() => setIndice(0), [value]);
+
+  const frase = opciones.length > 0 ? opciones[indice % opciones.length] : null;
+  const restante = frase ? restanteDe(value, frase) : "";
+
+  /**
+   * Aceptar reemplaza el campo con la frase COMPLETA, no concatena el gris.
+   *
+   * Asi la consulta enviada queda siempre igual a una de las frases del banco,
+   * sin importar como venia escrito lo tecleado (acentos, espacio doble,
+   * mayusculas). Concatenar dejaba cosas como "Cuánto me ahorro si..." con
+   * medio texto en un estilo y medio en otro.
+   */
+  const aceptar = () => {
+    if (!frase) return;
+    onChange(frase);
+    setIndice(0);
+  };
+
   return (
     <div ref={barraRef} className="relative rounded-full">
       <div className="relative flex items-center gap-3 rounded-full border border-line bg-surface py-2 pl-6 pr-2 shadow-[0_6px_24px_rgba(20,16,15,0.08)]">
-        <input
-          ref={inputRef}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") onSubmit();
-          }}
-          placeholder="Que informacion te gustaria consultar hoy?"
-          aria-label="Escribe lo que quieres resolver"
-          className="flex-1 bg-transparent text-sm text-ink placeholder:text-muted focus:outline-none"
-        />
+        <div className="relative min-w-0 flex-1">
+          {/*
+            La capa del fantasma se dibuja DEBAJO del input, no dentro.
+
+            El truco es que repite lo ya tecleado en `invisible` (ocupa su
+            espacio pero no se ve) y solo pinta en gris lo que falta: asi el
+            gris arranca exactamente donde termina el texto real, sin medir
+            nada. Depende de que las dos capas tengan la misma tipografia y el
+            mismo padding — el preflight de Tailwind deja el input en padding
+            cero, que es lo que hace que cuadre.
+
+            overflow-hidden porque cuando el texto pasa del ancho, el input
+            hace scroll horizontal y esta capa no: sin recortar, el gris se
+            saldria por debajo del boton de enviar.
+          */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 flex items-center overflow-hidden whitespace-pre text-sm"
+          >
+            <span className="invisible">{value}</span>
+            <span className="text-muted-soft">{restante}</span>
+          </div>
+
+          <input
+            ref={inputRef}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                onSubmit();
+                return;
+              }
+              if (!frase) return;
+
+              // Tab: el gesto estandar para aceptar una sugerencia en linea.
+              if (e.key === "Tab" && !e.shiftKey) {
+                e.preventDefault();
+                aceptar();
+                return;
+              }
+
+              /*
+               * Flecha derecha solo con el cursor AL FINAL y sin seleccion: si
+               * no, aceptar la frase le robaria al usuario el movimiento normal
+               * del cursor cuando esta corrigiendo algo a media linea.
+               */
+              if (e.key === "ArrowRight") {
+                const el = e.currentTarget;
+                const alFinal =
+                  el.selectionStart === value.length && el.selectionEnd === value.length;
+                if (alFinal) {
+                  e.preventDefault();
+                  aceptar();
+                }
+                return;
+              }
+
+              // Con varias frases posibles, las flechas verticales las recorren.
+              if ((e.key === "ArrowDown" || e.key === "ArrowUp") && opciones.length > 1) {
+                e.preventDefault();
+                const paso = e.key === "ArrowDown" ? 1 : -1;
+                setIndice((i) => (i + paso + opciones.length) % opciones.length);
+              }
+            }}
+            placeholder="Que informacion te gustaria consultar hoy?"
+            aria-label="Escribe lo que quieres resolver"
+            className="relative w-full bg-transparent text-sm text-ink placeholder:text-muted focus:outline-none"
+          />
+        </div>
+
+        {/*
+          Pista de teclado. Aparece solo cuando hay algo que aceptar, porque un
+          indicador permanente en una barra tan limpia se lee como ruido.
+
+          Se esconde en pantallas angostas: ahi no hay teclado fisico que
+          apretar y el espacio lo necesita el texto.
+        */}
+        {frase && (
+          <span
+            aria-hidden
+            className="hidden shrink-0 items-center gap-1 rounded-full border border-line px-2 py-1 text-[10px] uppercase tracking-wide text-muted sm:flex"
+          >
+            Tab
+            {opciones.length > 1 && <span className="text-muted-soft">· ↑↓ {opciones.length}</span>}
+          </span>
+        )}
 
         <button
           type="button"

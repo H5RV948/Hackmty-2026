@@ -26,6 +26,7 @@ export const ComponentRegistry: Record<string, ComponentType<WidgetProps>> = {
   CardShowcase: W.CardShowcase,
   CardRanking: W.CardRanking,
   RiskAlert: W.RiskAlert,
+  OutOfScopeCard: W.OutOfScopeCard,
 };
 
 export function isRegistered(type: string): boolean {

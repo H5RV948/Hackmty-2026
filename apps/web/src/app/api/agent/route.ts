@@ -13,7 +13,8 @@
  * era justo lo que rompia el ciclo adaptativo del reto.
  */
 import { validateA2UI } from "@banorte/a2ui";
-import type { A2UIMessage, ClientEvent } from "@banorte/a2ui";
+import type { A2UIMessage, ClientEvent, GridItem } from "@banorte/a2ui";
+import { clasificarConsulta, fueraDeAlcanceMessages } from "@/lib/agent/scope";
 import { openMcpSession, precargarContexto } from "@/lib/agent/mcp";
 import { reason } from "@/lib/agent/gemini";
 import { fallbackSurface, planSurfaces } from "@/lib/agent/planner";
@@ -21,7 +22,12 @@ import { fallbackSurface, planSurfaces } from "@/lib/agent/planner";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-type RequestBody = { event: ClientEvent; surfaces?: string[] };
+/**
+ * `layout` viaja junto con `surfaces` porque el filtro de alcance necesita
+ * saber donde esta cada widget para meter su tarjeta arriba sin descolocar el
+ * tablero: updateCanvasLayout reemplaza el layout completo, no lo parchea.
+ */
+type RequestBody = { event: ClientEvent; surfaces?: string[]; layout?: GridItem[] };
 
 /**
  * El agente razona sobre texto, no sobre la forma interna del evento.
@@ -57,7 +63,7 @@ function intentFromEvent(event: ClientEvent): string | null {
 }
 
 export async function POST(request: Request) {
-  const { event, surfaces = [] } = (await request.json()) as RequestBody;
+  const { event, surfaces = [], layout = [] } = (await request.json()) as RequestBody;
   const intent = intentFromEvent(event);
 
   const encoder = new TextEncoder();
@@ -78,6 +84,30 @@ export async function POST(request: Request) {
       if (!intent) {
         controller.close();
         return;
+      }
+
+      /*
+       * Cortocircuito de alcance.
+       *
+       * Va ANTES de abrir la sesion MCP porque el objetivo es justamente no
+       * pagar nada: sin esto, "hola" cuesta lo mismo que un tablero completo
+       * (sesion MCP + razonamiento + planner, dos llamadas al modelo) y gasta
+       * una peticion de la cuota diaria de Gemini para contestar un saludo.
+       *
+       * Solo aplica a lo que el usuario escribe. Un `ui_action` nace de un
+       * boton que nosotros dibujamos: si llegara aqui seria un bug nuestro, y
+       * filtrarlo esconderia el bug en vez de arreglarlo.
+       */
+      if (event.type === "user_message" && !event.forzado) {
+        const alcance = clasificarConsulta(event.text);
+        if (!alcance.dentro) {
+          console.info(`[scope] consulta fuera de alcance (${alcance.motivo}): "${event.text}"`);
+          for (const message of fueraDeAlcanceMessages(alcance.motivo, event.text, layout)) {
+            send(message);
+          }
+          controller.close();
+          return;
+        }
       }
 
       let mcp: Awaited<ReturnType<typeof openMcpSession>> | null = null;

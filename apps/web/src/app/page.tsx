@@ -1,11 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { A2UI_VERSION } from "@banorte/a2ui";
 import type { A2UIMessage, ClientEvent } from "@banorte/a2ui";
 import { ModularCanvas } from "@/components/ModularCanvas";
 import { PromptBar } from "@/components/PromptBar";
 import { SpotlightController } from "@/components/guidance/SpotlightController";
 import { useCanvas } from "@/lib/surfaceStore";
+/*
+ * Se importa el id en vez de repetir la cadena: el cliente tiene que borrar
+ * exactamente la misma surface que el servidor crea, y dos literales iguales
+ * en dos archivos distintos duran hasta que alguien renombra uno.
+ * `scope.ts` es TypeScript puro (regex y armado de A2UI), asi que entra al
+ * bundle del cliente sin arrastrar nada de servidor.
+ */
+import { SURFACE_FUERA_DE_ALCANCE } from "@/lib/agent/scope";
 
 /** Un turno del usuario: lo que escribio o lo que pico en la pantalla generada. */
 type Turno = {
@@ -105,7 +114,13 @@ export default function Home() {
         const response = await fetch("/api/agent", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ event, surfaces: Object.keys(state.surfaces) }),
+          // El layout viaja junto con los ids: el filtro de alcance lo necesita
+          // para insertar su tarjeta arriba sin descolocar el tablero.
+          body: JSON.stringify({
+            event,
+            surfaces: Object.keys(state.surfaces),
+            layout: state.layout,
+          }),
         });
         if (!response.body) return;
 
@@ -129,34 +144,74 @@ export default function Home() {
         setComponenteOcupado(null);
       }
     },
-    [applyMessage, state.surfaces],
+    [applyMessage, state.surfaces, state.layout],
+  );
+
+  /**
+   * Manda una consulta como si el usuario la hubiera tecleado.
+   *
+   * La usan tres caminos que tienen que verse identicos en pantalla: la barra
+   * del prompt, las sugerencias de la tarjeta de fuera de alcance y su boton de
+   * "preguntarlo de todos modos". Si cada uno armara su propio evento, el
+   * historial acabaria mostrando "sugerencia elegida: deuda" en vez de la
+   * pregunta, y el hilo de la sesion dejaria de leerse como una conversacion.
+   *
+   * La tarjeta de fuera de alcance se borra aqui, antes de mandar: ya cumplio
+   * su unico trabajo, que era conseguir esta pregunta. Si la nueva consulta
+   * tambien queda fuera, el servidor la vuelve a crear con el texto nuevo.
+   */
+  const preguntarTexto = useCallback(
+    (texto: string, forzado = false) => {
+      const limpio = texto.trim();
+      if (!limpio || thinking) return;
+      setComponenteOcupado(null); // la senial vuelve a la barra
+      setModoConsulta(true);
+      anotarTurno("pregunta", limpio);
+      applyMessage({
+        version: A2UI_VERSION,
+        deleteSurface: { surfaceId: SURFACE_FUERA_DE_ALCANCE },
+      });
+      void send({ type: "user_message", text: limpio, forzado });
+      // Se vacia junto con el arranque de la transicion, no al terminar: la
+      // pregunta ya quedo en el historial, dejarla en el campo solo invita a
+      // mandarla dos veces.
+      setInput("");
+    },
+    [thinking, send, anotarTurno, applyMessage],
   );
 
   const onEvent = useCallback(
     (event: ClientEvent) => {
       // El reacomodo del canvas no debe disparar una regeneracion de UI.
       if (event.type === "canvas_layout_changed") return;
+
+      /*
+       * Los dos eventos de OutOfScopeCard no son "interacciones con el
+       * tablero": son una pregunta nueva. Se convierten aqui, en el cliente, y
+       * no en el servidor, porque lo que cambia es de que tipo es el turno —y
+       * el turno es lo que el usuario ve en el historial.
+       */
+      if (
+        event.type === "ui_action" &&
+        (event.name === "sugerencia_elegida" || event.name === "consultar_de_todos_modos")
+      ) {
+        const texto = typeof event.payload?.texto === "string" ? event.payload.texto : "";
+        if (texto) {
+          preguntarTexto(texto, event.name === "consultar_de_todos_modos");
+          return;
+        }
+      }
+
       if (event.type === "ui_action") {
         setComponenteOcupado(event.componentId);
         anotarTurno("interaccion", describirAccion(event.name, event.payload));
       }
       void send(event);
     },
-    [send, anotarTurno],
+    [send, anotarTurno, preguntarTexto],
   );
 
-  const preguntar = useCallback(() => {
-    const texto = input.trim();
-    if (!texto || thinking) return;
-    setComponenteOcupado(null); // la senial vuelve a la barra
-    setModoConsulta(true);
-    anotarTurno("pregunta", texto);
-    void send({ type: "user_message", text: texto });
-    // Se vacia junto con el arranque de la transicion, no al terminar: la
-    // pregunta ya quedo en el historial, dejarla en el campo solo invita a
-    // mandarla dos veces.
-    setInput("");
-  }, [input, thinking, send, anotarTurno]);
+  const preguntar = useCallback(() => preguntarTexto(input), [preguntarTexto, input]);
 
   return (
     <main className="min-h-screen">

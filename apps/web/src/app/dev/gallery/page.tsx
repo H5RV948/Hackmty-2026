@@ -6,6 +6,9 @@
 
 import { A2UIRenderer } from "@/components/A2UIRenderer";
 import type { SurfaceState } from "@banorte/a2ui";
+// Las mismas capacidades que ofrece el asesor en vivo: si cambian alla, la
+// galeria las refleja sola en vez de quedarse con una copia vieja.
+import { CAPACIDADES } from "@/lib/suggestions";
 
 const examples: SurfaceState[] = [
   {
@@ -144,6 +147,46 @@ const examples: SurfaceState[] = [
           { id: "Banorte Básica", nombre: "Básica", puntaje: 81, porQue: "Anualidad de $500, la mitad que las demas." },
           { id: "Mujer Banorte", nombre: "Mujer Banorte", puntaje: 81, porQue: "Asistencias de salud y 6 MSI iniciales." },
         ],
+      },
+    },
+    dataModel: {},
+  },
+  // Los dos motivos por los que sale la tarjeta de fuera de alcance. Se ven
+  // juntos porque la diferencia entre ellos es el punto: el saludo abre la
+  // puerta, el otro tema explica que no y ofrece la salida de reenviar.
+  {
+    surfaceId: "g-fuera-charla",
+    catalogId: "gallery",
+    title: "OutOfScopeCard — saludo (sin consulta que reenviar)",
+    root: "fuera",
+    components: {
+      fuera: {
+        id: "fuera",
+        component: "OutOfScopeCard",
+        titulo: "Hola. Dime que quieres resolver y te armo la pantalla",
+        mensaje:
+          "Todavia no tengo una pregunta que analizar, y de temas generales no se nada: lo mio es tu tarjeta de credito y lo que debes en ella. Pica una de estas y arranco con tus numeros.",
+        sugerencias: CAPACIDADES.map((c) => ({ ...c })),
+        action: { event: { name: "sugerencia_elegida" } },
+      },
+    },
+    dataModel: {},
+  },
+  {
+    surfaceId: "g-fuera-tema",
+    catalogId: "gallery",
+    title: "OutOfScopeCard — otro tema (con boton de reenviar)",
+    root: "fuera",
+    components: {
+      fuera: {
+        id: "fuera",
+        component: "OutOfScopeCard",
+        titulo: "Eso se sale de lo que puedo resolver",
+        mensaje:
+          'Lamentablemente no puedo responder "como va a estar el clima manana". Soy el asesor financiero de Banorte y solo trabajo con tu deuda de tarjeta de credito y el credito al que puedes acceder. Esto si lo hago contigo:',
+        sugerencias: CAPACIDADES.map((c) => ({ ...c })),
+        consultaOriginal: "como va a estar el clima manana",
+        action: { event: { name: "sugerencia_elegida" } },
       },
     },
     dataModel: {},

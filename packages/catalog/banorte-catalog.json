@@ -371,6 +371,38 @@
           "description": "Cifras concretas del perfil que sostienen la alerta. Copialas de la tool."
         }
       }
+    },
+    "OutOfScopeCard": {
+      "phase": "preguntar",
+      "description": "Respuesta a una consulta que este asesor no puede atender: un saludo, una charla suelta o un tema ajeno a las finanzas del cliente. Dice que no se puede responder eso, explica que SI se puede hacer y ofrece preguntas listas para usar. No es un mensaje de error: es la puerta de entrada para quien no sabe que preguntar.",
+      "props": {
+        "titulo": {
+          "type": "string",
+          "required": true,
+          "bindable": true
+        },
+        "mensaje": {
+          "type": "string",
+          "required": true,
+          "bindable": true,
+          "description": "Por que no se puede responder eso, en una o dos lineas y sin reganar."
+        },
+        "sugerencias": {
+          "type": "array<{ id: string, texto: string, porQue: string }>",
+          "required": true,
+          "bindable": true,
+          "description": "Preguntas que el asesor SI resuelve. 'texto' se manda tal cual como consulta al picarla, asi que escribela como la escribiria el usuario. 'porQue' dice en una linea que obtiene si la pica."
+        },
+        "consultaOriginal": {
+          "type": "string",
+          "bindable": true,
+          "description": "Lo que el usuario habia escrito. Si viene, la UI agrega un boton para mandarla al agente de todos modos: es la salida cuando el filtro se equivoco."
+        },
+        "action": {
+          "type": "action",
+          "required": true
+        }
+      }
     }
   },
   "actions": {

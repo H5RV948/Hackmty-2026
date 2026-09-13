@@ -31,9 +31,18 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  /**
+   * `suppressHydrationWarning` en <html> y <body>: extensiones del navegador
+   * (LanguageTool inyecta `data-lt-installed`, Grammarly `data-gr-*`, los
+   * gestores de tema/dark-mode tocan la clase) modifican estos dos nodos antes
+   * de que React hidrate, y el mismatch resultante no es un bug nuestro.
+   *
+   * Solo afecta a estos elementos, un nivel de profundidad: los mismatches
+   * reales dentro de la app siguen reportandose.
+   */
   return (
-    <html lang="es" className={montserrat.variable}>
-      <body>{children}</body>
+    <html lang="es" className={montserrat.variable} suppressHydrationWarning>
+      <body suppressHydrationWarning>{children}</body>
     </html>
   );
 }
