@@ -18,6 +18,7 @@ import {
   validateA2UI,
   type A2UIMessage,
 } from "@banorte/a2ui";
+import { SIN_MARCO } from "@/lib/canvasLayout";
 import { generateJson } from "./gemini";
 import type { Reasoning } from "./gemini";
 
@@ -106,6 +107,13 @@ formato y sin simbolo de peso; el formato lo pone la UI):
   y ademas "destacadaId": "<id de la que trae recomendada:true>"
 - CardRanking.barras:           [{ "id": "...", "nombre": "Clásica", "puntaje": 82, "porQue": "Sin anualidad el primer anio y CAT de 121.4%." }]
   y ademas "destacadaId": el mismo id que en CardShowcase
+- BarChart.barras:              [{ "id": "12", "label": "12 meses", "valor": 18400, "secundario": 3387, "destacado": true, "pie": "$1,816/mes" }]
+  "valor" y "secundario" son NUMEROS sin formato. "secundario" y "pie" son
+  opcionales. Con "secundario" manda tambien "leyenda": ["Capital", "Intereses"].
+  "unidad" es "$", "%" o "".
+- DonutChart.segmentos:         [{ "id": "gasto", "label": "Gasto mensual", "valor": 15686 }]
+  De 2 a 5 segmentos que SUMEN un todo con sentido. "centro" es
+  { "valor": "$27,365", "etiqueta": "Ingreso" }.
 - HeadlineVerdict:              "veredicto" y "dato" y "datoEtiqueta" son TEXTO.
   "indicador" es { "valor": NUMERO de 0 a 100, "etiqueta": "..." } y se omite si
   la cifra no es un porcentaje. "apoyo" es [{ "label": "...", "value": "..." }]
@@ -149,7 +157,9 @@ PRIMERO MOSTRAR, DESPUES EXPLICAR — la regla que mas se rompe:
   - Abrir la pantalla con una explicacion. Se abre con el dato.
   - Un Text suelto como widget principal. Un Text solo sirve de nota al pie.
   - Repetir en texto una cifra que ya se ve en un widget.
-  - Mas de CINCO surfaces en una pantalla. Si no cabe en cinco, sobra algo.
+  - Mas de TRES tarjetas con marco. RiskAlert, HeadlineVerdict y NextSteps se
+    dibujan sin caja y no cuentan; todo lo demas es un cuadro, y el usuario ya
+    dijo que hay demasiados. Si no cabe en tres, junta o quita.
 
   Obligatorio, en este orden — es el orden en que creas las surfaces:
 
@@ -165,7 +175,9 @@ PRIMERO MOSTRAR, DESPUES EXPLICAR — la regla que mas se rompe:
 
   NIVEL 2, lo que explica esa conclusion, en widgets VISUALES:
     ProductPortfolio, CardRanking, CardShowcase, OptionComparator,
-    DebtSimulator, FinancialHealthCard. Dos o tres, no seis.
+    DebtSimulator, BarChart, DonutChart. Dos o tres, no seis.
+    Al menos UNO tiene que ser una grafica (BarChart, DonutChart, CardRanking
+    o DebtSimulator). Si vas a comparar cifras, grafícalas: no las escribas.
 
   NIVEL 3, siempre la ultima: NextSteps.
     De DOS a CUATRO caminos para seguir, redactados en primera persona porque se
@@ -237,8 +249,11 @@ RECETAS POR INTENCION — que tablero arma cada pregunta:
        contratados (copia tipo, familia, y formatea "cifra" con su etiqueta) y
        "sinContratar" son los que no tiene. El detalle por credito NO existe:
        no lo inventes, la tool te lo advierte en "limitacion".
-    3. Un widget mas SOLO si aporta: DebtSimulator si trae saldo de tarjeta,
-       o FinancialHealthCard si el ingreso y el gasto cuentan algo.
+    3. DonutChart "A donde se va tu ingreso": segmentos con el gasto mensual
+       y la capacidad de ahorro mensual (gastosMensuales y
+       capacidadAhorroMensual de la tool; juntos suman el ingreso), unidad "$",
+       y en "centro" el ingreso ya formateado con etiqueta "Ingreso".
+       Si trae saldo de tarjeta, DebtSimulator puede ir en lugar de la dona.
     4. NextSteps.
 
   "Que tarjeta me conviene" / "comparar tarjetas":
@@ -249,7 +264,9 @@ RECETAS POR INTENCION — que tablero arma cada pregunta:
     1. HeadlineVerdict con su capacidad real (ingreso menos gastos, o su
        capacidad de ahorro mensual: son cifras de la tool).
     2. ProductPortfolio con lo que ya tiene, para que vea contra que compara.
-    3. OptionComparator si hay alternativas con cifras de tool que comparar.
+    3. DonutChart con su ingreso repartido entre gasto y capacidad de ahorro:
+       es el margen real que tendria para una mensualidad nueva.
+       OptionComparator solo si hay alternativas con cifras de tool.
     4. NextSteps.
     Si no hay datos para comparar creditos concretos, DILO en el veredicto y
     ofrece lo que si puedes: no armes un comparador con numeros inventados.
@@ -325,7 +342,8 @@ reintento completo, y a los tres la pantalla sale incompleta:
   [ ] La ultima surface es NextSteps, y ninguno de sus pasos propone algo fuera
       de tarjetas, creditos o prestamos.
   [ ] Ningun texto tuyo pasa de dos renglones.
-  [ ] Cinco surfaces como maximo.
+  [ ] Maximo TRES tarjetas con marco (RiskAlert, HeadlineVerdict y NextSteps
+      no cuentan) y al menos UNA grafica.
 
 Catalogo de componentes permitidos:
 `;
@@ -636,6 +654,8 @@ function revisarReglas(messages: A2UIMessage[], intent: string): string[] {
     CardRanking: { prop: "barras", claves: ["id", "nombre", "puntaje"] },
     CardShowcase: { prop: "tarjetas", claves: ["id", "nombre", "imagen"] },
     OptionComparator: { prop: "opciones", claves: ["id", "nombre", "pagoMensual"] },
+    BarChart: { prop: "barras", claves: ["id", "label", "valor"] },
+    DonutChart: { prop: "segmentos", claves: ["id", "label", "valor"] },
   };
 
   for (const m of messages) {
@@ -684,6 +704,39 @@ function revisarReglas(messages: A2UIMessage[], intent: string): string[] {
           );
         }
       }
+    }
+  }
+
+  /*
+   * Cuadros y graficas, contados.
+   *
+   * Lo que el usuario percibe como "demasiados cuadros" son las tarjetas con
+   * marco, no las surfaces: el titular, la alerta y los siguientes pasos se
+   * dibujan sin caja (SIN_MARCO). Por eso el tope se cuenta sobre las otras.
+   *
+   * Y un tablero sin ninguna grafica es justo la queja de "solo muchas
+   * ventanas": se rechaza igual que uno sin titular.
+   */
+  if (esTablero) {
+    const tipoPorSurface = new Map<string, string>();
+    for (const m of messages) {
+      if (!("updateComponents" in m)) continue;
+      const { surfaceId, root, components } = m.updateComponents;
+      const raiz = components.find((c) => c.id === root) ?? components[0];
+      if (raiz) tipoPorSurface.set(surfaceId, raiz.component);
+    }
+    const conMarco = [...tipoPorSurface.values()].filter((t) => !SIN_MARCO.has(t));
+    if (conMarco.length > 3) {
+      errores.push(
+        `El tablero tiene ${conMarco.length} tarjetas con marco (${conMarco.join(", ")}) y el maximo son 3. RiskAlert, HeadlineVerdict y NextSteps no cuentan porque van sin caja. Quita o junta las que menos aporten: el usuario pidio menos cuadros.`,
+      );
+    }
+
+    const GRAFICAS = ["BarChart", "DonutChart", "CardRanking", "DebtSimulator", "SpendingBreakdown", "CashflowChart"];
+    if (!GRAFICAS.some((g) => usados.has(g))) {
+      errores.push(
+        "El tablero no tiene ninguna grafica. Agrega al menos una —BarChart para comparar cantidades, DonutChart para partes de un todo— con cifras de las tools. Una pantalla de puras tarjetas de texto es justo lo que no queremos.",
+      );
     }
   }
 

@@ -162,6 +162,14 @@ export type ClientEvent =
        * mismo boton esperando otro resultado.
        */
       forzado?: boolean;
+      /**
+       * Primera pregunta de la sesion. Solo con esta en true el servidor puede
+       * estrenar cliente sintetico. Lo decide el cliente porque es el unico
+       * que sabe si ya hubo preguntas: que el canvas este vacio no basta, ya
+       * que cambiar de tema tambien vacia el canvas y NO debe cambiar de
+       * persona.
+       */
+      inicioSesion?: boolean;
     };
 
 /* ------------------------------------------------------------------ */

@@ -131,6 +131,17 @@ const CATALOGO = {
   action: { event: { name: "card_selected" } },
 };
 
+const DONA = {
+  component: "DonutChart",
+  titulo: "A donde se va tu ingreso",
+  unidad: "$",
+  centro: { valor: "$2,573", etiqueta: "Ingreso" },
+  segmentos: [
+    { id: "gasto", label: "Gasto mensual", valor: 1910 },
+    { id: "ahorro", label: "Capacidad de ahorro", valor: 663 },
+  ],
+};
+
 const TABLEROS: Record<string, SurfaceState[]> = {
   "Tarjetas (el de tu captura)": [
     surface("s1", "Alerta de riesgo", RIESGO),
@@ -142,8 +153,9 @@ const TABLEROS: Record<string, SurfaceState[]> = {
   "Analiza mi perfil": [
     surface("s1", "Tu situacion", TITULAR),
     surface("s2", "Tus productos", CARTERA),
-    surface("s3", "Simulador", SIMULADOR),
-    surface("s4", "Siguiente", SIGUIENTE),
+    surface("s3", "Tu ingreso", DONA),
+    surface("s4", "Simulador", SIMULADOR),
+    surface("s5", "Siguiente", SIGUIENTE),
   ],
   "Tarjetas (el del reporte)": [
     surface("s1", "Evaluacion de riesgo", RIESGO),

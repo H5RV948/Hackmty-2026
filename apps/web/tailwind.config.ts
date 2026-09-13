@@ -4,16 +4,21 @@ export default {
   content: ["./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
+      /*
+       * Cada color va en forma de canales con <alpha-value>, no como var()
+       * pelon: es lo unico que deja funcionar `bg-brand/40` y compania. Ver el
+       * comentario de los -rgb en globals.css.
+       */
       colors: {
-        ink: "var(--ink)",
-        surface: "var(--surface)",
-        muted: "var(--muted)",
-        "muted-soft": "var(--muted-soft)",
-        line: "var(--line)",
-        brand: "var(--brand)",
-        "brand-soft": "var(--brand-soft)",
-        positive: "var(--positive)",
-        warning: "var(--warning)",
+        ink: "rgb(var(--ink-rgb) / <alpha-value>)",
+        surface: "rgb(var(--surface-rgb) / <alpha-value>)",
+        muted: "rgb(var(--muted-rgb) / <alpha-value>)",
+        "muted-soft": "rgb(var(--muted-soft-rgb) / <alpha-value>)",
+        line: "rgb(var(--line-rgb) / <alpha-value>)",
+        brand: "rgb(var(--brand-rgb) / <alpha-value>)",
+        "brand-soft": "rgb(var(--brand-soft-rgb) / <alpha-value>)",
+        positive: "rgb(var(--positive-rgb) / <alpha-value>)",
+        warning: "rgb(var(--warning-rgb) / <alpha-value>)",
       },
       fontFamily: {
         sans: ["var(--font-sans)", "system-ui", "sans-serif"],

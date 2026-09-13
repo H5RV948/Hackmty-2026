@@ -30,7 +30,13 @@ import {
 } from "react";
 import type { ClientEvent, GridItem, SurfaceState } from "@banorte/a2ui";
 import { A2UIRenderer } from "./A2UIRenderer";
-import { acomodar, anchoPreferido, filasParaPixeles, type Bloque } from "@/lib/canvasLayout";
+import {
+  SIN_MARCO,
+  acomodar,
+  anchoPreferido,
+  filasParaPixeles,
+  type Bloque,
+} from "@/lib/canvasLayout";
 
 /**
  * react-grid-layout@1.5 se publica como CommonJS. Bajo el `import()` de
@@ -231,6 +237,7 @@ export function ModularCanvas({
             onEvent={onEvent}
             busyId={busyId}
             onMedida={anotarAltura}
+            medida={alturas[surfaceId] !== undefined}
           />
         );
       })}
@@ -249,6 +256,8 @@ type PropsTarjeta = {
   onEvent: (event: ClientEvent) => void;
   busyId?: string | null;
   onMedida: (surfaceId: string, pixeles: number) => void;
+  /** Ya reporto su alto real y el grid ya la coloco donde va. */
+  medida: boolean;
   /*
    * Lo que inyecta react-grid-layout al clonar la tarjeta. No son opcionales
    * por gusto: si alguna se queda sin reenviar al <article>, la tarjeta se
@@ -283,10 +292,15 @@ type PropsTarjeta = {
  * el ancho no cambia cuando cambia la altura de la celda.
  */
 const Tarjeta = forwardRef<HTMLElement, PropsTarjeta>(function Tarjeta(
-  { surface, onEvent, busyId, onMedida, className = "", style, children, ...resto },
+  { surface, onEvent, busyId, onMedida, medida, className = "", style, children, ...resto },
   ref,
 ) {
   const contenidoRef = useRef<HTMLDivElement>(null);
+
+  // Titular, alerta y siguientes pasos van sin caja: ver SIN_MARCO.
+  const raiz = surface.root ?? Object.keys(surface.components)[0];
+  const tipo = raiz ? surface.components[raiz]?.component : undefined;
+  const sinMarco = tipo !== undefined && SIN_MARCO.has(tipo);
 
   useEffect(() => {
     const el = contenidoRef.current;
@@ -303,33 +317,55 @@ const Tarjeta = forwardRef<HTMLElement, PropsTarjeta>(function Tarjeta(
       {...resto}
       ref={ref}
       style={style}
-      className={`${className} overflow-hidden rounded-2xl border border-line bg-surface shadow-[0_1px_2px_rgba(20,16,15,0.04)]`}
+      /*
+        Invisible hasta que se mide.
+
+        El primer cuadro se dibuja con un alto de arranque, antes de que el
+        ResizeObserver reporte el real; el grid coloca todo con ese alto y
+        luego anima cada bloque a su lugar. Con cajas opacas eso se veia como
+        tarjetas deslizandose. Sin marco —titular, alerta, siguientes pasos—
+        se veia texto encimado sobre texto durante la animacion.
+
+        `opacity` y no `display: none`: el bloque tiene que ocupar su espacio
+        y dejarse medir aunque todavia no se vea.
+      */
+      className={`${className} group/tarjeta transition-opacity duration-300 ${
+        medida ? "opacity-100" : "opacity-0"
+      } ${
+        sinMarco
+          ? ""
+          : "overflow-hidden rounded-2xl border border-line bg-surface shadow-[0_1px_2px_rgba(20,16,15,0.04)]"
+      }`}
     >
+      {/*
+        Sin marco no hay barra de titulo donde agarrar, asi que el asa flota
+        en la esquina y aparece al pasar el cursor. Va fuera del envoltorio
+        medido: es absoluta y no debe sumar al alto de la tarjeta.
+      */}
+      {sinMarco && (
+        <div
+          title="Arrastra para mover"
+          className="drag-handle absolute right-1 top-1 z-10 grid h-7 w-7 cursor-grab place-items-center rounded-lg bg-surface/90 text-muted-soft opacity-0 shadow-sm transition-opacity hover:text-brand active:cursor-grabbing group-hover/tarjeta:opacity-100"
+        >
+          <Asa />
+        </div>
+      )}
+
       <div ref={contenidoRef}>
         {/*
           El asa de arrastre tiene que VERSE. Un `cursor: grab` solo aparece
           cuando el cursor ya esta encima, asi que nadie descubria que el
           tablero se puede reacomodar: habia que pasar por ahi de casualidad.
-          Los seis puntos son la convencion para "esto se agarra", y se marcan
-          en rojo al pasar el cursor para confirmarlo antes de arrastrar.
         */}
-        <header className="drag-handle group/asa flex cursor-grab items-center gap-2 border-b border-line px-4 py-2 active:cursor-grabbing">
-          <svg
-            aria-hidden
-            viewBox="0 0 10 16"
-            width="10"
-            height="16"
-            className="shrink-0 text-line transition-colors group-hover/asa:text-brand"
-          >
-            <g fill="currentColor">
-              <circle cx="2" cy="3" r="1.3" /><circle cx="8" cy="3" r="1.3" />
-              <circle cx="2" cy="8" r="1.3" /><circle cx="8" cy="8" r="1.3" />
-              <circle cx="2" cy="13" r="1.3" /><circle cx="8" cy="13" r="1.3" />
-            </g>
-          </svg>
-          <span className="truncate text-xs text-muted">{surface.title ?? surface.surfaceId}</span>
-        </header>
-        <div className="p-4">
+        {!sinMarco && (
+          <header className="drag-handle group/asa flex cursor-grab items-center gap-2 border-b border-line px-4 py-2 active:cursor-grabbing">
+            <span className="text-line transition-colors group-hover/asa:text-brand">
+              <Asa />
+            </span>
+            <span className="truncate text-xs text-muted">{surface.title ?? surface.surfaceId}</span>
+          </header>
+        )}
+        <div className={sinMarco ? "px-1 py-2" : "p-4"}>
           <A2UIRenderer surface={surface} onEvent={onEvent} busyId={busyId} />
         </div>
       </div>
@@ -337,6 +373,19 @@ const Tarjeta = forwardRef<HTMLElement, PropsTarjeta>(function Tarjeta(
     </article>
   );
 });
+
+/** Seis puntos: la convencion para "esto se agarra". */
+function Asa() {
+  return (
+    <svg aria-hidden viewBox="0 0 10 16" width="10" height="16" className="shrink-0">
+      <g fill="currentColor">
+        <circle cx="2" cy="3" r="1.3" /><circle cx="8" cy="3" r="1.3" />
+        <circle cx="2" cy="8" r="1.3" /><circle cx="8" cy="8" r="1.3" />
+        <circle cx="2" cy="13" r="1.3" /><circle cx="8" cy="13" r="1.3" />
+      </g>
+    </svg>
+  );
+}
 
 function CanvasSkeleton() {
   return <div className="h-64 animate-pulse rounded-2xl border border-line bg-surface" />;

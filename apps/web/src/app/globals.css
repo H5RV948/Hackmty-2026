@@ -10,19 +10,39 @@
   --ink: #14100f;
   --surface: #ffffff;
   --muted: #6b625f;
-  /*
-   * Gris del texto fantasma del autocompletado. Es un token y no un
-   * `text-muted/60` porque Tailwind descarta el modificador de opacidad cuando
-   * el color esta declarado como var(): la clase no se genera, el span se
-   * queda sin regla de color y hereda el --ink del cuerpo. O sea que la
-   * sugerencia se pintaba negra, indistinguible de lo que el usuario tecleo.
-   */
+  /* Gris del texto fantasma del autocompletado. */
   --muted-soft: #a8a09d;
   --line: #e6e1df;
   --brand: #eb0029;
   --brand-soft: #fdeef1;
   --positive: #0f7a52;
   --warning: #b45309;
+
+  /*
+   * Los mismos colores, en canales RGB sueltos.
+   *
+   * Tailwind solo puede aplicar opacidad (`bg-brand/40`, `ring-brand/30`) a un
+   * color que sepa descomponer. Con `var(--brand)` no puede, y en vez de
+   * avisar DESCARTA la clase: no llega al CSS y el elemento se queda sin
+   * fondo. Asi se perdieron once clases a la vez, entre ellas el relleno de
+   * las barras 2 a N del ranking —solo la primera, que no usaba opacidad,
+   * salia roja— y el anillo de la tarjeta seleccionada.
+   *
+   * tailwind.config.ts arma cada color como `rgb(var(--x-rgb) / <alpha-value>)`
+   * y con eso cualquier modificador de opacidad funciona. Los hex de arriba se
+   * quedan porque el CSS y los SVG los usan directo.
+   *
+   * Si cambias un color, cambia LOS DOS: el hex y sus canales.
+   */
+  --ink-rgb: 20 16 15;
+  --surface-rgb: 255 255 255;
+  --muted-rgb: 107 98 95;
+  --muted-soft-rgb: 168 160 157;
+  --line-rgb: 230 225 223;
+  --brand-rgb: 235 0 41;
+  --brand-soft-rgb: 253 238 241;
+  --positive-rgb: 15 122 82;
+  --warning-rgb: 180 83 9;
   /*
    * --font-brand la inyecta next/font desde layout.tsx (Montserrat, la
    * sustituta libre de la Gotham de Banorte). El fallback va dentro del var()

@@ -99,7 +99,7 @@
     },
     "CashflowChart": {
       "phase": "analizar",
-      "description": "Serie mensual de ingresos contra gastos.",
+      "description": "Barras agrupadas de ingreso contra gasto por mes. OJO: el seed de clientes NO trae una serie mensual, solo un mes tipico. No la uses salvo que una tool devuelva varios meses: inventar meses es inventar cifras. Para ingreso contra gasto de un solo mes usa DonutChart.",
       "props": {
         "titulo": {
           "type": "string",
@@ -114,7 +114,7 @@
     },
     "SpendingBreakdown": {
       "phase": "analizar",
-      "description": "Distribucion del gasto por categoria.",
+      "description": "Dona del gasto por categoria. OJO: el seed NO trae gasto por categoria. No la uses salvo que una tool devuelva categorias con monto.",
       "props": {
         "titulo": {
           "type": "string",
@@ -488,6 +488,71 @@
           "type": "action",
           "required": true,
           "description": "Siempre { \"event\": { \"name\": \"siguiente_paso\" } }."
+        }
+      }
+    },
+    "BarChart": {
+      "phase": "analizar",
+      "description": "Grafica de barras verticales para COMPARAR cantidades de un vistazo: el CAT de varias tarjetas, la anualidad de cada una, la mensualidad por plazo. Usala en vez de escribir cifras comparadas en texto. Cada valor sale de una tool.",
+      "props": {
+        "titulo": {
+          "type": "string",
+          "required": true
+        },
+        "subtitulo": {
+          "type": "string",
+          "description": "Una linea: que se compara."
+        },
+        "unidad": {
+          "type": "enum",
+          "values": [
+            "$",
+            "%",
+            ""
+          ],
+          "default": "$"
+        },
+        "barras": {
+          "type": "array<{ id: string, label: string, valor: number, secundario: number, destacado: boolean, pie: string }>",
+          "required": true,
+          "bindable": true,
+          "description": "De 2 a 8 barras. valor es NUMERO sin formato. secundario (opcional) se apila encima, p.ej. intereses sobre capital. destacado marca en rojo pleno la que importa. pie es una linea chica bajo la etiqueta."
+        },
+        "leyenda": {
+          "type": "array<string>",
+          "description": "Solo si usas secundario: [nombre de valor, nombre de secundario]."
+        }
+      }
+    },
+    "DonutChart": {
+      "phase": "analizar",
+      "description": "Dona para mostrar PARTES DE UN TODO: como se reparte el ingreso entre gasto y ahorro, que parte de la linea de credito esta usada contra la disponible. Solo si los segmentos de verdad suman un total que tenga sentido. Cada valor sale de una tool.",
+      "props": {
+        "titulo": {
+          "type": "string",
+          "required": true
+        },
+        "subtitulo": {
+          "type": "string"
+        },
+        "unidad": {
+          "type": "enum",
+          "values": [
+            "$",
+            "%",
+            ""
+          ],
+          "default": "$"
+        },
+        "segmentos": {
+          "type": "array<{ id: string, label: string, valor: number }>",
+          "required": true,
+          "bindable": true,
+          "description": "De 2 a 5 segmentos. valor es NUMERO sin formato."
+        },
+        "centro": {
+          "type": "{ valor: string, etiqueta: string }",
+          "description": "Texto en medio de la dona: el total ya formateado y que es."
         }
       }
     }

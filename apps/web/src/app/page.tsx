@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { A2UI_VERSION } from "@banorte/a2ui";
-import type { A2UIMessage, ClientEvent } from "@banorte/a2ui";
+import type { A2UIMessage, ClientEvent, GridItem } from "@banorte/a2ui";
 import { ModularCanvas } from "@/components/ModularCanvas";
 import { PromptBar } from "@/components/PromptBar";
 import { SpotlightController } from "@/components/guidance/SpotlightController";
@@ -14,13 +14,15 @@ import { useCanvas } from "@/lib/surfaceStore";
  * `scope.ts` es TypeScript puro (regex y armado de A2UI), asi que entra al
  * bundle del cliente sin arrastrar nada de servidor.
  */
-import { SURFACE_FUERA_DE_ALCANCE } from "@/lib/agent/scope";
+import { SURFACE_FUERA_DE_ALCANCE, temaDe, type Tema } from "@/lib/agent/scope";
 
 /** Un turno del usuario: lo que escribio o lo que pico en la pantalla generada. */
 type Turno = {
   id: number;
   tipo: "pregunta" | "interaccion";
   texto: string;
+  /** Esta pregunta cambio de tema y arranco un tablero nuevo. */
+  nuevoTema?: boolean;
 };
 
 /**
@@ -76,12 +78,18 @@ export default function Home() {
   const [historial, setHistorial] = useState<Turno[]>([]);
   const turnoId = useRef(0);
 
-  const anotarTurno = useCallback((tipo: Turno["tipo"], texto: string) => {
+  const anotarTurno = useCallback((tipo: Turno["tipo"], texto: string, nuevoTema = false) => {
     turnoId.current += 1;
-    setHistorial((previo) => [...previo, { id: turnoId.current, tipo, texto }]);
+    setHistorial((previo) => [...previo, { id: turnoId.current, tipo, texto, nuevoTema }]);
   }, []);
 
+  /** Tema del tablero en pantalla. Ver `temaDe`: decide si ampliar o reemplazar. */
+  const temaActual = useRef<Tema | null>(null);
+
   const hayPantalla = state.order.length > 0;
+
+  const preguntasHechas = historial.filter((t) => t.tipo === "pregunta");
+  const ultimaPregunta = preguntasHechas[preguntasHechas.length - 1]?.texto ?? "";
 
   /** Al acoplarse, el foco sigue a la barra de arriba para encadenar preguntas. */
   const inputAcopladoRef = useRef<HTMLInputElement>(null);
@@ -108,7 +116,7 @@ export default function Home() {
 
   /** Manda contexto al agente y aplica los mensajes A2UI que regresan. */
   const send = useCallback(
-    async (event: ClientEvent) => {
+    async (event: ClientEvent, contexto?: { surfaces: string[]; layout: GridItem[] }) => {
       setThinking(true);
       try {
         const response = await fetch("/api/agent", {
@@ -116,10 +124,12 @@ export default function Home() {
           headers: { "Content-Type": "application/json" },
           // El layout viaja junto con los ids: el filtro de alcance lo necesita
           // para insertar su tarjeta arriba sin descolocar el tablero.
+          // `contexto` gana cuando la pregunta acaba de vaciar el tablero: el
+          // estado de React todavia no refleja el borrado en este render.
           body: JSON.stringify({
             event,
-            surfaces: Object.keys(state.surfaces),
-            layout: state.layout,
+            surfaces: contexto?.surfaces ?? Object.keys(state.surfaces),
+            layout: contexto?.layout ?? state.layout,
           }),
         });
         if (!response.body) return;
@@ -166,18 +176,39 @@ export default function Home() {
       if (!limpio || thinking) return;
       setComponenteOcupado(null); // la senial vuelve a la barra
       setModoConsulta(true);
-      anotarTurno("pregunta", limpio);
-      applyMessage({
-        version: A2UI_VERSION,
-        deleteSurface: { surfaceId: SURFACE_FUERA_DE_ALCANCE },
-      });
-      void send({ type: "user_message", text: limpio, forzado });
+
+      const inicioSesion = !historial.some((t) => t.tipo === "pregunta");
+
+      /*
+       * Ampliar o empezar de cero.
+       *
+       * Si la pregunta es de otro tema que el tablero en pantalla, el tablero
+       * se borra y se arma uno nuevo. Si es del mismo tema —o no nombra
+       * ninguno, como "dame mas detalle"— se agrega a lo que ya hay.
+       */
+      const tema = temaDe(limpio);
+      const hayTablero = state.order.some((id) => id !== SURFACE_FUERA_DE_ALCANCE);
+      const cambiaTema =
+        hayTablero && tema !== null && temaActual.current !== null && tema !== temaActual.current;
+      if (tema !== null) temaActual.current = tema;
+
+      anotarTurno("pregunta", limpio, cambiaTema);
+
+      const aBorrar = cambiaTema ? state.order : [SURFACE_FUERA_DE_ALCANCE];
+      for (const surfaceId of aBorrar) {
+        applyMessage({ version: A2UI_VERSION, deleteSurface: { surfaceId } });
+      }
+
+      void send(
+        { type: "user_message", text: limpio, forzado, inicioSesion },
+        cambiaTema ? { surfaces: [], layout: [] } : undefined,
+      );
       // Se vacia junto con el arranque de la transicion, no al terminar: la
       // pregunta ya quedo en el historial, dejarla en el campo solo invita a
       // mandarla dos veces.
       setInput("");
     },
-    [thinking, send, anotarTurno, applyMessage],
+    [thinking, send, anotarTurno, applyMessage, historial, state.order],
   );
 
   const onEvent = useCallback(
@@ -325,6 +356,40 @@ export default function Home() {
                   showRing={!modoConsulta && thinking && !componenteOcupado}
                 />
               </div>
+
+              {/*
+                Regreso a la conversacion.
+
+                La flecha de arriba trae al usuario a la portada sin tirar la
+                sesion —el tablero y el historial siguen vivos en el estado—,
+                pero desde aqui no habia forma de volver a verlos: solo
+                preguntando otra cosa. Este boton reabre la conversacion
+                exactamente donde se dejo, y cita la ultima pregunta para que
+                se sepa a donde lleva.
+              */}
+              {preguntasHechas.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setModoConsulta(true)}
+                  className={`mt-4 inline-flex max-w-full items-center gap-3 rounded-full border border-line bg-surface/90 py-2 pl-2 pr-5 text-left shadow-[0_6px_24px_rgba(20,16,15,0.08)] backdrop-blur transition-all hover:border-brand ${
+                    modoConsulta ? "pointer-events-none opacity-0" : "opacity-100"
+                  }`}
+                >
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-brand text-white">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <path d="M5 12h13M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium text-ink">Volver a mi conversacion</span>
+                    <span className="block truncate text-xs text-muted">
+                      {preguntasHechas.length === 1
+                        ? ultimaPregunta
+                        : `${ultimaPregunta} · ${preguntasHechas.length} preguntas`}
+                    </span>
+                  </span>
+                </button>
+              )}
             </div>
           </div>
         </section>
@@ -375,7 +440,12 @@ export default function Home() {
                 {historial.map((turno, index) => {
                   const actual = index === historial.length - 1;
                   return (
-                    <li key={turno.id} className="flex gap-3 text-sm">
+                    <li
+                      key={turno.id}
+                      className={`flex gap-3 text-sm ${
+                        turno.nuevoTema ? "mt-3 border-t border-dashed border-line pt-3" : ""
+                      }`}
+                    >
                       <span
                         aria-hidden
                         className={`mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full ${
@@ -390,6 +460,11 @@ export default function Home() {
                         }
                       >
                         {turno.texto}
+                        {turno.nuevoTema && (
+                          <span className="ml-2 rounded-full bg-brand-soft px-2 py-0.5 align-middle text-[10px] font-semibold uppercase tracking-wide text-brand">
+                            Nuevo tablero
+                          </span>
+                        )}
                       </span>
                     </li>
                   );
@@ -407,8 +482,8 @@ export default function Home() {
                   <circle cx="2" cy="13" r="1.3" /><circle cx="8" cy="13" r="1.3" />
                 </g>
               </svg>
-              Este tablero es tuyo: arrastra las tarjetas desde su titulo para acomodarlo, o jala
-              su orilla derecha para cambiarles el ancho.
+              Este tablero es tuyo: arrastra cualquier bloque desde los seis puntos para acomodarlo, o jala
+              su orilla derecha para cambiarle el ancho.
             </p>
           )}
 

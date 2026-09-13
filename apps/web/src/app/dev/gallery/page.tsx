@@ -255,6 +255,88 @@ const examples: SurfaceState[] = [
     },
     dataModel: {},
   },
+  // Graficas: las cuatro del catalogo con datos de ejemplo.
+  {
+    surfaceId: "g-barras",
+    catalogId: "gallery",
+    title: "BarChart — capital e intereses por plazo",
+    root: "barras",
+    components: {
+      barras: {
+        id: "barras",
+        component: "BarChart",
+        titulo: "Cuanto pagas en total segun el plazo",
+        subtitulo: "Lo que debes mas los intereses de cada opcion",
+        unidad: "$",
+        leyenda: ["Lo que debes", "Intereses"],
+        barras: [
+          { id: "12", label: "12 meses", valor: 18400, secundario: 3387, destacado: true, pie: "$1,816/mes" },
+          { id: "18", label: "18 meses", valor: 18400, secundario: 5360, pie: "$1,320/mes" },
+          { id: "24", label: "24 meses", valor: 18400, secundario: 7675, pie: "$1,086/mes" },
+        ],
+      },
+    },
+    dataModel: {},
+  },
+  {
+    surfaceId: "g-dona",
+    catalogId: "gallery",
+    title: "DonutChart — a donde se va el ingreso",
+    root: "dona",
+    components: {
+      dona: {
+        id: "dona",
+        component: "DonutChart",
+        titulo: "A donde se va tu ingreso",
+        unidad: "$",
+        centro: { valor: "$27,365", etiqueta: "Ingreso" },
+        segmentos: [
+          { id: "gasto", label: "Gasto mensual", valor: 15686 },
+          { id: "ahorro", label: "Capacidad de ahorro", valor: 11679 },
+        ],
+      },
+    },
+    dataModel: {},
+  },
+  {
+    surfaceId: "g-cashflow",
+    catalogId: "gallery",
+    title: "CashflowChart — ingreso contra gasto por mes",
+    root: "flujo",
+    components: {
+      flujo: {
+        id: "flujo",
+        component: "CashflowChart",
+        titulo: "Ingreso contra gasto",
+        serie: [
+          { mes: "Jun", ingreso: 27365, gasto: 15686 },
+          { mes: "Jul", ingreso: 27365, gasto: 18210 },
+          { mes: "Ago", ingreso: 28100, gasto: 16950 },
+        ],
+      },
+    },
+    dataModel: {},
+  },
+  {
+    surfaceId: "g-gasto",
+    catalogId: "gallery",
+    title: "SpendingBreakdown — gasto por categoria",
+    root: "gasto",
+    components: {
+      gasto: {
+        id: "gasto",
+        component: "SpendingBreakdown",
+        titulo: "En que se va tu dinero",
+        categorias: [
+          { nombre: "Vivienda", monto: 6500 },
+          { nombre: "Comida", monto: 4200 },
+          { nombre: "Transporte", monto: 2300 },
+          { nombre: "Tarjeta", monto: 2686 },
+        ],
+      },
+    },
+    dataModel: {},
+  },
   // TODO(fase 2): un ejemplo por cada componente del catalogo.
 ];
 

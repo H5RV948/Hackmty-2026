@@ -61,6 +61,8 @@ const ANCHO_PREFERIDO: Record<string, number> = {
   SpendingBreakdown: 6,
   OpportunityGrid: 6,
   CashflowChart: 6,
+  BarChart: 6,
+  DonutChart: 6,
   ExplorationCard: 6,
   UnderstandingSummary: 6,
   ActionPlan: 6,
@@ -184,3 +186,24 @@ export function acomodar(bloques: Bloque[], columnas: number): GridItem[] {
 export function filasParaPixeles(pixeles: number, rowHeight: number, margenY: number): number {
   return Math.max(1, Math.ceil((pixeles + margenY) / (rowHeight + margenY)));
 }
+
+/**
+ * Widgets que se dibujan SIN la tarjeta del canvas alrededor.
+ *
+ * Es la respuesta a "menos cuadros". Cada surface venia envuelta en su propia
+ * caja con borde y barra de titulo, y algunos widgets traen ademas su caja
+ * interior: la alerta de riesgo era literalmente un recuadro dentro de otro
+ * recuadro. Con cinco widgets eso son cinco a diez rectangulos compitiendo.
+ *
+ * Estos tres no necesitan marco:
+ *  - HeadlineVerdict es el titular: una cifra grande se lee mejor sobre el
+ *    fondo que encerrada.
+ *  - NextSteps es una tira de botones de cierre.
+ *  - RiskAlert ya trae su propia caja de color; esa caja ES la tarjeta.
+ *
+ * Se siguen pudiendo arrastrar: el asa aparece al pasar el cursor.
+ *
+ * El planner importa esta lista para contar las tarjetas CON marco de una
+ * pantalla (ver revisarReglas): lo que el usuario percibe como "cuadros".
+ */
+export const SIN_MARCO: ReadonlySet<string> = new Set(["HeadlineVerdict", "NextSteps", "RiskAlert"]);

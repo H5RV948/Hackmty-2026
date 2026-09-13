@@ -11,7 +11,8 @@
  * Para agregar uno nuevo, sigue los cinco pasos de AGENTS.md, regla 1.
  */
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 export type EmitFn = (name: string, payload?: Record<string, unknown>) => void;
 
@@ -98,22 +99,77 @@ export function FinancialHealthCard({ titulo, lectura, metricas }: WidgetProps) 
   );
 }
 
-// TODO(fase 2): graficar la serie. Contrato en banorte-catalog.json.
-export function CashflowChart({ titulo }: WidgetProps) {
+/**
+ * Ingreso contra gasto, mes por mes: barras agrupadas.
+ *
+ * Ojo con los datos: el seed de clientes NO trae una serie mensual, solo el
+ * ingreso y el gasto de un mes tipico. Este widget dibuja lo que le den, pero
+ * el planner no debe inventarle meses (ver su descripcion en el catalogo).
+ */
+export function CashflowChart({ titulo, serie }: WidgetProps) {
+  const meses = Array.isArray(serie)
+    ? (serie as { mes: string; ingreso: number; gasto: number }[]).filter(
+        (m) => typeof m?.ingreso === "number" && typeof m?.gasto === "number",
+      )
+    : [];
+  const tope = Math.max(1, ...meses.flatMap((m) => [m.ingreso, m.gasto]));
+
   return (
-    <section className="space-y-2">
-      <h2 className="text-lg font-semibold">{String(titulo ?? "")}</h2>
-      <p className="text-xs text-muted">Pendiente: grafica de ingresos contra gastos.</p>
+    <section className="space-y-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-lg font-semibold">{String(titulo ?? "")}</h2>
+        <Leyenda items={[["bg-positive", "Ingreso"], ["bg-brand", "Gasto"]]} />
+      </div>
+      {meses.length === 0 ? (
+        <p className="text-xs text-muted">Sin datos para graficar.</p>
+      ) : (
+        <>
+          <div className="flex h-44 items-end gap-3 border-b border-line">
+            {meses.map((m) => (
+              <div key={m.mes} className="flex h-full flex-1 items-end justify-center gap-1">
+                <div
+                  title={`Ingreso ${money(m.ingreso)}`}
+                  className="w-1/3 max-w-[20px] rounded-t bg-positive"
+                  style={{ height: `${(m.ingreso / tope) * 100}%` }}
+                />
+                <div
+                  title={`Gasto ${money(m.gasto)}`}
+                  className="w-1/3 max-w-[20px] rounded-t bg-brand"
+                  style={{ height: `${(m.gasto / tope) * 100}%` }}
+                />
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-3">
+            {meses.map((m) => (
+              <p key={m.mes} className="flex-1 truncate text-center text-[11px] text-muted">
+                {m.mes}
+              </p>
+            ))}
+          </div>
+        </>
+      )}
     </section>
   );
 }
 
-// TODO(fase 2): distribucion por categoria.
-export function SpendingBreakdown({ titulo }: WidgetProps) {
+/** A donde se va el dinero, por categoria: una dona con su leyenda. */
+export function SpendingBreakdown({ titulo, categorias }: WidgetProps) {
+  const items = Array.isArray(categorias)
+    ? (categorias as { nombre: string; monto: number }[])
+        .filter((c) => typeof c?.monto === "number" && c.monto > 0)
+        .map((c) => ({ id: c.nombre, label: c.nombre, valor: c.monto }))
+    : [];
+  const total = items.reduce((a, c) => a + c.valor, 0);
+
   return (
-    <section className="space-y-2">
+    <section className="space-y-3">
       <h2 className="text-lg font-semibold">{String(titulo ?? "")}</h2>
-      <p className="text-xs text-muted">Pendiente: desglose de gasto por categoria.</p>
+      {items.length === 0 ? (
+        <p className="text-xs text-muted">Sin datos para graficar.</p>
+      ) : (
+        <Dona segmentos={items} unidad="$" centro={{ valor: money(total), etiqueta: "Total" }} />
+      )}
     </section>
   );
 }
@@ -362,6 +418,31 @@ export function DebtSimulator({
           </button>
         ))}
       </div>
+      {/*
+        La grafica es tambien el selector: picar una barra elige ese plazo.
+
+        Cada barra es el costo total partido en dos: lo que ya debes (igual en
+        todos los plazos) y los intereses encima. Asi se VE lo que en texto
+        cuesta explicar: alargar el plazo baja la mensualidad pero la barra
+        crece, porque pagas mas al final.
+      */}
+      {lista.length > 1 && lista.every((o) => numero(o.interesesTotales) !== undefined) && (
+        <Barras
+          barras={lista.map((o) => ({
+            id: String(o.meses),
+            label: `${o.meses} meses`,
+            valor: Number(saldo),
+            secundario: o.interesesTotales,
+            pie: numero(o.pagoMensual) !== undefined ? `${money(o.pagoMensual)}/mes` : undefined,
+          }))}
+          unidad="$"
+          leyenda={["Lo que debes", "Intereses"]}
+          elegido={elegido !== undefined ? String(elegido) : undefined}
+          onElegir={(id) => setElegido(Number(id))}
+          alto="h-36"
+        />
+      )}
+
       <div className="flex flex-wrap gap-8 border-t border-line pt-3">
         <Stat
           id="pago"
@@ -406,7 +487,7 @@ export function OptionComparator({ titulo, opciones, emit, action }: WidgetProps
       <h2 className="text-lg font-semibold">{String(titulo ?? "")}</h2>
       <div className="grid gap-3 sm:grid-cols-3">
         {items.map((o) => (
-          <article key={o.id} className="rounded-xl border border-line bg-surface p-4">
+          <article key={o.id} className="rounded-xl bg-brand-soft/40 p-4">
             <p className="font-medium">{o.nombre}</p>
             <p className="tnum mt-2 text-xl font-semibold">{money(o.pagoMensual)}</p>
             <p className="tnum text-xs text-muted">al mes · {o.plazoMeses} meses</p>
@@ -493,41 +574,140 @@ export function CardShowcase({ titulo, tarjetas, destacadaId, emit, action }: Wi
     (action as { event?: { name?: string } } | undefined)?.event?.name ?? "card_selected";
 
   /*
-   * El detalle vive en un panel DEBAJO de la reja, no encima del plastico.
+   * Ventana flotante junto al cursor.
    *
-   * Antes era una capa `absolute inset-0` que aparecia al pasar el cursor y
-   * tapaba la tarjeta entera. Tres problemas: tapaba justo la imagen que el
-   * usuario estaba mirando, obligaba a sostener el cursor para leer, y en una
-   * pantalla tactil no hay "pasar el cursor" — o salia siempre puesta o no
-   * salia nunca.
+   * Historia de este widget, para no repetirla:
+   *  1. Capa superpuesta al pasar el cursor: tapaba la imagen que el usuario
+   *     estaba mirando y en tactil no funcionaba.
+   *  2. Panel debajo de la reja: no tapaba nada, pero con muchas tarjetas el
+   *     detalle quedaba hasta el fondo y habia que elegir, bajar, leer y
+   *     volver a subir para comparar la siguiente.
+   *  3. (Esta) Ventana que sigue al cursor, al LADO de la tarjeta, nunca
+   *     encima. Pasar de una tarjeta a otra es mover el mouse: no hay que
+   *     hacer clic ni scroll para comparar.
    *
-   * Con el panel abajo, la reja no se mueve al elegir, el detalle siempre
-   * aparece en el mismo sitio (el ojo ya sabe donde mirar) y funciona igual con
-   * dedo que con raton. El canvas mide su alto solo, asi que la tarjeta del
-   * tablero crece lo justo cuando el panel se abre.
+   * Va en un portal a document.body con posicion fija. Dentro del tablero la
+   * cortaria el `overflow-hidden` de la tarjeta del canvas.
+   *
+   * Con dedo no hay "pasar el cursor": el primer toque abre la ventana fija
+   * (con su boton) y el segundo toque sobre la misma tarjeta la analiza. Con
+   * mouse la ventana ya esta abierta, asi que un clic la analiza directo.
    */
-  const inicial = lista.find((t) => t.id === destacadaId)?.id ?? lista[0]?.id ?? null;
-  const [abierta, setAbierta] = useState<string | null>(null);
+  const [globo, setGlobo] = useState<{
+    id: string;
+    x: number;
+    y: number;
+    fijo: boolean;
+    izquierdaAncla?: number;
+  } | null>(null);
+  const globoRef = useRef<HTMLDivElement>(null);
+  const [altoGlobo, setAltoGlobo] = useState(260);
 
-  const detalle = lista.find((t) => t.id === (abierta ?? inicial)) ?? null;
+  useEffect(() => {
+    if (!globo) return;
+    const alto = globoRef.current?.offsetHeight;
+    if (alto && alto !== altoGlobo) setAltoGlobo(alto);
+  }, [globo, altoGlobo]);
+
+  const abierta = globo !== null;
+  const fija = globo?.fijo === true;
+  useEffect(() => {
+    if (!abierta) return;
+    const cerrar = () => setGlobo(null);
+    const conTecla = (e: KeyboardEvent) => {
+      if (e.key === "Escape") cerrar();
+    };
+    const fuera = (e: PointerEvent) => {
+      if (!fija) return;
+      const destino = e.target as HTMLElement;
+      if (globoRef.current?.contains(destino)) return;
+      if (destino.closest?.("[data-ficha-tarjeta]")) return;
+      cerrar();
+    };
+    // Posicion fija: si algo hace scroll, la ventana se despegaria de su
+    // tarjeta. Mejor cerrarla que dejarla flotando sobre otra cosa.
+    window.addEventListener("keydown", conTecla);
+    window.addEventListener("scroll", cerrar, true);
+    window.addEventListener("pointerdown", fuera);
+    return () => {
+      window.removeEventListener("keydown", conTecla);
+      window.removeEventListener("scroll", cerrar, true);
+      window.removeEventListener("pointerdown", fuera);
+    };
+  }, [abierta, fija]);
+
+  const ANCHO = 300;
+  const posicion =
+    globo && typeof window !== "undefined"
+      ? (() => {
+          const margen = 18;
+          const noCabe = globo.x + margen + ANCHO > window.innerWidth - 8;
+          const izquierda = noCabe
+            ? (globo.izquierdaAncla ?? globo.x) - margen - ANCHO
+            : globo.x + margen;
+          const arriba = Math.min(globo.y + margen, window.innerHeight - altoGlobo - 8);
+          return { left: Math.max(8, izquierda), top: Math.max(8, arriba) };
+        })()
+      : null;
+  const ficha = globo ? lista.find((t) => t.id === globo.id) : undefined;
+
+  const analizar = (t: FichaTarjeta) => {
+    emit(name, { cardId: t.id, nombre: t.nombre });
+    setGlobo(null);
+  };
 
   return (
     <section>
       <h3 className="text-base font-semibold text-ink">{String(titulo ?? "")}</h3>
+      <p className="mt-0.5 text-xs text-muted">
+        Pasa el cursor sobre una tarjeta para ver sus detalles.
+      </p>
 
-      <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-3">
+      <div className="mt-3 grid grid-cols-3 gap-2 xl:grid-cols-4">
         {lista.map((t) => {
           // La destacada la elige la tool (recomendada:true), no el modelo.
           const destacada = destacadaId !== undefined && t.id === destacadaId;
-          const seleccionada = detalle?.id === t.id;
+          const activa = globo?.id === t.id;
           return (
             <button
               key={t.id}
               type="button"
-              aria-pressed={seleccionada}
-              onClick={() => setAbierta(t.id)}
-              className={`relative overflow-hidden rounded-xl border bg-surface p-3 text-left transition-colors ${
-                seleccionada
+              data-ficha-tarjeta
+              aria-describedby={activa ? `ficha-${t.id}` : undefined}
+              onPointerEnter={(e) => {
+                if (e.pointerType === "mouse")
+                  setGlobo({ id: t.id, x: e.clientX, y: e.clientY, fijo: false });
+              }}
+              onPointerMove={(e) => {
+                if (e.pointerType !== "mouse") return;
+                const { clientX, clientY } = e;
+                setGlobo((g) => (g && g.id === t.id && !g.fijo ? { ...g, x: clientX, y: clientY } : g));
+              }}
+              onPointerLeave={(e) => {
+                if (e.pointerType === "mouse") setGlobo((g) => (g && !g.fijo ? null : g));
+              }}
+              onFocus={(e) => {
+                // Solo foco de teclado: un toque tambien enfoca, y abrir aqui
+                // haria que el primer toque analizara la tarjeta sin mostrarla.
+                if (!e.currentTarget.matches(":focus-visible")) return;
+                const r = e.currentTarget.getBoundingClientRect();
+                setGlobo((g) =>
+                  g?.id === t.id
+                    ? g
+                    : { id: t.id, x: r.right, y: r.top, fijo: false, izquierdaAncla: r.left },
+                );
+              }}
+              onBlur={() => setGlobo((g) => (g && !g.fijo ? null : g))}
+              onClick={(e) => {
+                if (globo?.id === t.id) {
+                  analizar(t);
+                  return;
+                }
+                const r = e.currentTarget.getBoundingClientRect();
+                setGlobo({ id: t.id, x: r.right, y: r.top, fijo: true, izquierdaAncla: r.left });
+              }}
+              className={`relative rounded-xl border bg-surface p-2 text-center transition-colors ${
+                activa
                   ? "border-brand ring-2 ring-brand/30"
                   : destacada
                     ? "border-brand/50 hover:border-brand"
@@ -535,74 +715,94 @@ export function CardShowcase({ titulo, tarjetas, destacadaId, emit, action }: Wi
               }`}
             >
               {destacada && (
-                <span className="absolute left-0 top-0 z-10 rounded-br-lg bg-brand px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
+                <span className="absolute left-0 top-0 z-10 rounded-br-lg rounded-tl-xl bg-brand px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white">
                   Te conviene
                 </span>
               )}
-
-              <img
-                src={t.imagen}
-                alt={t.nombre}
-                loading="lazy"
-                className="mx-auto h-24 w-auto object-contain"
-              />
-
-              <p className="mt-2 text-center text-xs font-semibold leading-tight text-ink">
-                {t.nombre}
-              </p>
-
-              {typeof t.anualidad === "number" && (
-                <p className="tnum mt-0.5 text-center text-[11px] text-muted">
-                  {t.anualidad === 0 ? "Sin anualidad" : `Anualidad ${money(t.anualidad)}`}
-                </p>
-              )}
+              <img src={t.imagen} alt={t.nombre} loading="lazy" className="mx-auto h-14 w-auto object-contain" />
+              <p className="mt-1 truncate text-[11px] font-semibold text-ink">{t.nombre}</p>
             </button>
           );
         })}
       </div>
 
-      {detalle && (
-        <div className="mt-4 rounded-xl border border-line bg-brand-soft/40 p-4">
-          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-            <p className="text-sm font-semibold text-ink">{detalle.nombre}</p>
-            <p className="tnum text-xs text-muted">
-              {typeof detalle.cat === "number" && (
-                <>CAT promedio <span className="font-medium text-ink">{detalle.cat}%</span></>
-              )}
-              {typeof detalle.anualidad === "number" && (
-                <> · anualidad <span className="font-medium text-ink">{money(detalle.anualidad)}</span></>
-              )}
-            </p>
-          </div>
+      {ficha &&
+        posicion &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            ref={globoRef}
+            id={`ficha-${ficha.id}`}
+            role="tooltip"
+            style={{ left: posicion.left, top: posicion.top, width: ANCHO }}
+            className={`fixed z-[70] rounded-2xl border border-line bg-surface p-4 shadow-[0_18px_48px_rgba(20,16,15,0.18)] ${
+              fija ? "" : "pointer-events-none"
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <img src={ficha.imagen} alt="" className="h-12 w-auto shrink-0 object-contain" />
+              <div className="min-w-0">
+                {destacadaId === ficha.id && (
+                  <span className="rounded-full bg-brand px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+                    La que mas te conviene
+                  </span>
+                )}
+                <p className="mt-1 text-sm font-semibold leading-tight text-ink">{ficha.nombre}</p>
+              </div>
+            </div>
 
-          {(detalle.bullets ?? []).length > 0 && (
-            <ul className="mt-3 grid gap-1 sm:grid-cols-2">
-              {(detalle.bullets ?? []).map((b) => (
-                <li key={b} className="flex gap-2 text-xs leading-relaxed text-muted">
-                  <span aria-hidden className="mt-[6px] h-1 w-1 shrink-0 rounded-full bg-brand" />
-                  {b}
-                </li>
-              ))}
-            </ul>
-          )}
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <div className="rounded-lg bg-brand-soft/60 px-3 py-2">
+                <p className="text-[10px] uppercase tracking-wide text-muted">CAT promedio</p>
+                <p className="tnum text-lg font-bold text-ink">
+                  {typeof ficha.cat === "number" ? `${ficha.cat}%` : "—"}
+                </p>
+              </div>
+              <div className="rounded-lg bg-brand-soft/60 px-3 py-2">
+                <p className="text-[10px] uppercase tracking-wide text-muted">Anualidad</p>
+                <p className="tnum text-lg font-bold text-ink">
+                  {typeof ficha.anualidad !== "number"
+                    ? "—"
+                    : ficha.anualidad === 0
+                      ? "Sin costo"
+                      : money(ficha.anualidad)}
+                </p>
+              </div>
+            </div>
 
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={() => emit(name, { cardId: detalle.id, nombre: detalle.nombre })}
-              className="rounded-full bg-brand px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90"
-            >
-              Analizar esta tarjeta para mi
-            </button>
-            {detalle.fuente && (
-              <p className="text-[10px] leading-tight text-muted">
-                Fuente oficial
-                {detalle.fechaVerificacion ? ` · vigente al ${detalle.fechaVerificacion}` : ""}
+            {(ficha.bullets ?? []).length > 0 && (
+              <ul className="mt-3 space-y-1">
+                {(ficha.bullets ?? []).slice(0, 4).map((b) => (
+                  <li key={b} className="flex gap-2 text-xs leading-relaxed text-muted">
+                    <span aria-hidden className="mt-[6px] h-1 w-1 shrink-0 rounded-full bg-brand" />
+                    {b}
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {fija ? (
+              <button
+                type="button"
+                onClick={() => analizar(ficha)}
+                className="mt-3 w-full rounded-full bg-brand px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+              >
+                Analizar esta tarjeta para mi
+              </button>
+            ) : (
+              <p className="mt-3 text-[11px] font-medium text-brand">
+                Haz clic en la tarjeta para analizarla para ti
               </p>
             )}
-          </div>
-        </div>
-      )}
+
+            {ficha.fuente && (
+              <p className="mt-2 text-[10px] leading-tight text-muted">
+                Fuente oficial{ficha.fechaVerificacion ? ` · vigente al ${ficha.fechaVerificacion}` : ""}
+              </p>
+            )}
+          </div>,
+          document.body,
+        )}
     </section>
   );
 }
@@ -636,12 +836,16 @@ export function CardRanking({ titulo, criterio, barras, destacadaId }: WidgetPro
               </div>
 
               <div className="mt-1 h-2.5 w-full overflow-hidden rounded-full bg-line">
-                {/* El primer lugar va en rojo pleno; los otros en rojo suave,
-                    para que el orden se lea sin tener que comparar longitudes. */}
-                <div
-                  className={i === 0 ? "h-full rounded-full bg-brand" : "h-full rounded-full bg-brand/40"}
-                  style={{ width: `${pct}%` }}
-                />
+                {/*
+                  Todas las barras van en rojo pleno. La recomendada ya se
+                  distingue por su sello, y la longitud dice el resto.
+
+                  Antes las barras 2 a N usaban `bg-brand/40`, una clase que
+                  Tailwind no generaba (ver los -rgb de globals.css): el div se
+                  quedaba sin fondo y solo se veia la pista gris, como si esas
+                  tarjetas tuvieran cero puntos.
+                */}
+                <div className="h-full rounded-full bg-brand" style={{ width: `${pct}%` }} />
               </div>
 
               {b.porQue ? <p className="mt-1 text-xs text-muted">{b.porQue}</p> : null}
@@ -945,7 +1149,7 @@ export function ProductPortfolio({ titulo, productos, sinContratar, emit, action
     <section className="space-y-4">
       <h2 className="text-lg font-semibold">{String(titulo ?? "")}</h2>
 
-      <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
         {items.map((p) => {
           const Contenedor = name ? "button" : "div";
           return (
@@ -954,7 +1158,7 @@ export function ProductPortfolio({ titulo, productos, sinContratar, emit, action
                 {...(name
                   ? { type: "button" as const, onClick: () => emit(name, { productoId: p.id, tipo: p.tipo }) }
                   : {})}
-                className={`h-full w-full rounded-xl border border-line bg-surface p-4 text-left ${
+                className={`h-full w-full rounded-xl bg-brand-soft/40 p-4 text-left ${
                   name ? "transition-colors hover:border-brand hover:bg-brand-soft" : ""
                 }`}
               >
@@ -1035,6 +1239,272 @@ export function NextSteps({ titulo, pasos, emit, action }: WidgetProps) {
           </button>
         ))}
       </div>
+    </section>
+  );
+}
+
+/* ---------------------------------------------------------------- */
+/* Graficas                                                          */
+/* ---------------------------------------------------------------- */
+
+/*
+ * Todas las graficas son HTML y SVG a mano, sin libreria.
+ *
+ * No por purismo: instalar dependencias dentro del contenedor es de las cosas
+ * que ya sabemos que rompen (AGENTS.md, seccion 8), y lo que hace falta aqui
+ * —barras y donas— son veinte lineas cada una. Asi ademas heredan los tokens
+ * de color y la tipografia sin pelearse con el tema de una libreria.
+ */
+
+function formatear(valor: number, unidad: unknown): string {
+  if (!Number.isFinite(valor)) return "—";
+  if (unidad === "$") return money(Math.round(valor));
+  if (unidad === "%") return `${Math.round(valor * 10) / 10}%`;
+  return valor.toLocaleString("es-MX");
+}
+
+function Leyenda({ items }: { items: [string, string][] }) {
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      {items.map(([color, texto]) => (
+        <span key={texto} className="inline-flex items-center gap-1.5 text-[11px] text-muted">
+          <span aria-hidden className={`h-2 w-2 rounded-sm ${color}`} />
+          {texto}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+type Barra = {
+  id: string;
+  label: string;
+  valor: number;
+  /** Segundo tramo apilado encima (intereses sobre capital, por ejemplo). */
+  secundario?: number;
+  destacado?: boolean;
+  /** Linea chica bajo la etiqueta: "$1,186/mes". */
+  pie?: string;
+};
+
+/**
+ * Barras verticales, con tramo apilado opcional.
+ *
+ * Con `onElegir` cada columna es un boton y la grafica funciona como selector:
+ * la elegida va en rojo pleno y las demas en rojo suave. Sin seleccion ni
+ * destacada, todas van en rojo pleno.
+ */
+function Barras({
+  barras,
+  unidad,
+  leyenda,
+  elegido,
+  onElegir,
+  alto = "h-44",
+}: {
+  barras: Barra[];
+  unidad?: unknown;
+  leyenda?: [string, string?];
+  elegido?: string;
+  onElegir?: (id: string) => void;
+  alto?: string;
+}) {
+  const lista = barras.filter((b) => Number.isFinite(b.valor));
+  const tope = Math.max(1, ...lista.map((b) => b.valor + (b.secundario ?? 0)));
+  const hayActivo = elegido !== undefined || lista.some((b) => b.destacado === true);
+  const conSecundario = lista.some((b) => (b.secundario ?? 0) > 0);
+  const esActivo = (b: Barra) => (elegido !== undefined ? b.id === elegido : b.destacado === true);
+
+  return (
+    <div className="space-y-2">
+      {leyenda && conSecundario && (
+        <Leyenda items={[["bg-brand", leyenda[0]], ["bg-warning", leyenda[1] ?? ""]]} />
+      )}
+
+      <div className={`flex ${alto} items-end gap-2 border-b border-line pt-5 sm:gap-3`}>
+        {lista.map((b) => {
+          const activo = esActivo(b);
+          const total = b.valor + (b.secundario ?? 0);
+          const Columna = onElegir ? "button" : "div";
+          return (
+            <Columna
+              key={b.id}
+              {...(onElegir
+                ? { type: "button" as const, onClick: () => onElegir(b.id), "aria-pressed": activo }
+                : {})}
+              className="group flex h-full min-w-0 flex-1 flex-col items-center justify-end"
+            >
+              <div
+                className="relative flex w-full max-w-[56px] flex-col"
+                style={{ height: `${Math.max(2, (total / tope) * 100)}%` }}
+              >
+                <span
+                  className={`tnum absolute -top-5 left-1/2 -translate-x-1/2 whitespace-nowrap text-[11px] ${
+                    activo ? "font-semibold text-ink" : "text-muted"
+                  }`}
+                >
+                  {formatear(total, unidad)}
+                </span>
+                {(b.secundario ?? 0) > 0 && (
+                  <div
+                    className="w-full rounded-t-md bg-warning"
+                    style={{ height: `${((b.secundario ?? 0) / total) * 100}%` }}
+                  />
+                )}
+                <div
+                  className={`w-full flex-1 ${(b.secundario ?? 0) > 0 ? "" : "rounded-t-md"} ${
+                    !hayActivo || activo ? "bg-brand" : "bg-brand/40"
+                  } ${onElegir ? "transition-opacity group-hover:opacity-80" : ""}`}
+                />
+              </div>
+            </Columna>
+          );
+        })}
+      </div>
+
+      <div className="flex gap-2 sm:gap-3">
+        {lista.map((b) => (
+          <div key={b.id} className="min-w-0 flex-1 text-center">
+            <p className={`truncate text-[11px] ${esActivo(b) ? "font-semibold text-ink" : "text-muted"}`}>
+              {b.label}
+            </p>
+            {b.pie && <p className="tnum truncate text-[10px] text-muted">{b.pie}</p>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const PALETA_DONA = [
+  { svg: "var(--brand)", clase: "bg-brand" },
+  { svg: "var(--warning)", clase: "bg-warning" },
+  { svg: "var(--positive)", clase: "bg-positive" },
+  { svg: "var(--ink)", clase: "bg-ink" },
+  { svg: "var(--muted-soft)", clase: "bg-muted-soft" },
+];
+
+/** Dona con leyenda: partes de un todo, con su porcentaje y su monto. */
+function Dona({
+  segmentos,
+  unidad,
+  centro,
+}: {
+  segmentos: { id: string; label: string; valor: number }[];
+  unidad?: unknown;
+  centro?: { valor?: string; etiqueta?: string };
+}) {
+  const lista = segmentos.filter((sg) => Number.isFinite(sg.valor) && sg.valor > 0);
+  const total = lista.reduce((a, sg) => a + sg.valor, 0);
+  const radio = 40;
+  const circunferencia = 2 * Math.PI * radio;
+
+  let acumulado = 0;
+  const arcos = lista.map((sg, i) => {
+    const largo = total > 0 ? (sg.valor / total) * circunferencia : 0;
+    // Un respiro entre tramos para que no se lean como una sola mancha.
+    const hueco = lista.length > 1 ? Math.min(1.2, largo / 2) : 0;
+    const arco = { id: sg.id, color: PALETA_DONA[i % PALETA_DONA.length].svg, largo: Math.max(0, largo - hueco), desde: acumulado };
+    acumulado += largo;
+    return arco;
+  });
+
+  return (
+    <div className="flex flex-wrap items-center gap-6">
+      <div className="relative h-36 w-36 shrink-0">
+        <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90" aria-hidden>
+          <circle cx="50" cy="50" r={radio} fill="none" stroke="var(--line)" strokeWidth="13" />
+          {arcos.map((a) => (
+            <circle
+              key={a.id}
+              cx="50"
+              cy="50"
+              r={radio}
+              fill="none"
+              stroke={a.color}
+              strokeWidth="13"
+              strokeDasharray={`${a.largo} ${circunferencia}`}
+              strokeDashoffset={-a.desde}
+            />
+          ))}
+        </svg>
+        {centro && (
+          <div className="absolute inset-0 grid place-items-center text-center">
+            <div>
+              <p className="tnum text-lg font-bold leading-none text-ink">{centro.valor}</p>
+              <p className="mt-1 text-[10px] uppercase tracking-wide text-muted">{centro.etiqueta}</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <ul className="min-w-[12rem] flex-1 space-y-2">
+        {lista.map((sg, i) => (
+          <li key={sg.id} className="flex items-center gap-2 text-sm">
+            <span aria-hidden className={`h-2.5 w-2.5 shrink-0 rounded-sm ${PALETA_DONA[i % PALETA_DONA.length].clase}`} />
+            <span className="min-w-0 flex-1 truncate text-ink">{sg.label}</span>
+            <span className="tnum text-xs text-muted">{total > 0 ? Math.round((sg.valor / total) * 100) : 0}%</span>
+            <span className="tnum w-24 text-right text-sm font-medium text-ink">{formatear(sg.valor, unidad)}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/**
+ * Comparar cantidades lado a lado: CAT de varias tarjetas, mensualidad por
+ * plazo, costo de cada opcion. Existe para que el planner deje de escribir
+ * "la opcion A cuesta X y la B cuesta Y" en un parrafo.
+ */
+export function BarChart({ titulo, subtitulo, unidad, barras, leyenda }: WidgetProps) {
+  const lista = Array.isArray(barras)
+    ? (barras as Barra[]).filter((b) => typeof b?.valor === "number")
+    : [];
+  const nombres = Array.isArray(leyenda) ? (leyenda as string[]) : undefined;
+
+  return (
+    <section className="space-y-3">
+      <div>
+        <h2 className="text-lg font-semibold">{String(titulo ?? "")}</h2>
+        {subtitulo ? <p className="mt-0.5 text-xs text-muted">{String(subtitulo)}</p> : null}
+      </div>
+      {lista.length === 0 ? (
+        <p className="text-xs text-muted">Sin datos para graficar.</p>
+      ) : (
+        <Barras
+          barras={lista}
+          unidad={unidad ?? "$"}
+          leyenda={nombres ? [nombres[0] ?? "", nombres[1]] : undefined}
+        />
+      )}
+    </section>
+  );
+}
+
+/** Partes de un todo: como se reparte el ingreso, que parte de la linea esta usada. */
+export function DonutChart({ titulo, subtitulo, unidad, segmentos, centro }: WidgetProps) {
+  const lista = Array.isArray(segmentos)
+    ? (segmentos as { id: string; label: string; valor: number }[]).filter(
+        (sg) => typeof sg?.valor === "number",
+      )
+    : [];
+
+  return (
+    <section className="space-y-3">
+      <div>
+        <h2 className="text-lg font-semibold">{String(titulo ?? "")}</h2>
+        {subtitulo ? <p className="mt-0.5 text-xs text-muted">{String(subtitulo)}</p> : null}
+      </div>
+      {lista.length === 0 ? (
+        <p className="text-xs text-muted">Sin datos para graficar.</p>
+      ) : (
+        <Dona
+          segmentos={lista}
+          unidad={unidad ?? "$"}
+          centro={centro as { valor?: string; etiqueta?: string } | undefined}
+        />
+      )}
     </section>
   );
 }

@@ -30,6 +30,8 @@ export const ComponentRegistry: Record<string, ComponentType<WidgetProps>> = {
   HeadlineVerdict: W.HeadlineVerdict,
   ProductPortfolio: W.ProductPortfolio,
   NextSteps: W.NextSteps,
+  BarChart: W.BarChart,
+  DonutChart: W.DonutChart,
 };
 
 export function isRegistered(type: string): boolean {

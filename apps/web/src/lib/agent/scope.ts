@@ -211,3 +211,41 @@ export function fueraDeAlcanceMessages(
     },
   ];
 }
+
+/* ------------------------------------------------------------------ */
+/* Tema de la conversacion                                             */
+/* ------------------------------------------------------------------ */
+
+export type Tema = "deuda" | "tarjetas" | "creditos" | "perfil";
+
+/**
+ * De que tema es una pregunta, para decidir si el tablero se AMPLIA o se
+ * REEMPLAZA.
+ *
+ * Dentro del mismo tema, la pregunta nueva agrega a lo que ya hay: "y si lo
+ * pago en 12 meses" sobre el tablero de deuda. Al cambiar de tema, el tablero
+ * anterior estorba: si el usuario paso de su deuda a "que credito me
+ * conviene", las tarjetas de reestructura ya no explican nada y solo empujan
+ * la respuesta nueva hacia abajo.
+ *
+ * Devuelve null cuando la frase no nombra ningun tema ("dame mas detalle",
+ * "y eso?"): esas se apoyan en lo que ya esta en pantalla, asi que nunca
+ * disparan un tablero nuevo.
+ *
+ * El orden importa. "Pagar menos intereses de mi tarjeta" es deuda aunque
+ * diga tarjeta, y "tarjeta de credito" es tarjetas aunque diga credito.
+ */
+const TEMAS: [Tema, RegExp][] = [
+  ["deuda", /\b(interes|intereses|reestructur\w*|pagar menos|pago minimo|debo|deuda|deudas|liquidar|abonar|adeudo|plazo|plazos)\b/],
+  ["tarjetas", /\b(tarjeta|tarjetas|plastico|anualidad|cat)\b/],
+  ["creditos", /\b(credito|creditos|prestamo|prestamos|hipoteca|hipotecario|automotriz|financiamiento)\b/],
+  ["perfil", /\b(perfil|productos|situacion|panorama|finanzas|cartera|salud financiera|mi mes)\b/],
+];
+
+export function temaDe(texto: string): Tema | null {
+  const limpio = normalizar(texto);
+  for (const [tema, patron] of TEMAS) {
+    if (patron.test(limpio)) return tema;
+  }
+  return null;
+}

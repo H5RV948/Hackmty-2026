@@ -128,23 +128,20 @@ export async function POST(request: Request) {
         mcp = await openMcpSession();
 
         /*
-         * `nuevoCaso` rota a otro cliente sintetico. Solo puede pasar en la
-         * PRIMERA consulta de la sesion, cuando el canvas todavia esta vacio.
+         * `nuevoCaso` rota a otro cliente sintetico, y SOLO puede pasar en la
+         * primera pregunta de la sesion.
          *
-         * Antes se mandaba en cada consulta escrita, y el efecto era absurdo:
-         * el usuario preguntaba "analiza mi perfil", le contestabamos "Gabriela,
-         * tu saldo es...", pedia mas detalle y en la siguiente pantalla ya era
-         * Fernando con otras cifras. Una misma sesion tiene una sola persona;
-         * seguir preguntando no te convierte en alguien mas.
+         * Antes se mandaba en cada consulta escrita y el usuario cambiaba de
+         * nombre y de cifras a media conversacion ("Gabriela" en un tablero,
+         * "Fernando" en el siguiente). Despues se ato a "el canvas esta
+         * vacio", pero eso dejo de servir cuando cambiar de tema empezo a
+         * vaciar el canvas a proposito: el tablero nuevo habria llegado con
+         * otra persona.
          *
-         * La tarjeta de fuera de alcance no cuenta como pantalla: si la unica
-         * surface es esa, el usuario todavia no ha empezado y su primera
-         * consulta de verdad si puede estrenar cliente.
+         * Asi que lo decide el cliente, que es el unico que sabe si ya hubo
+         * preguntas (`inicioSesion`). Un tablero nuevo no es una persona nueva.
          */
-        const soloFueraDeAlcance =
-          surfaces.length === 0 ||
-          (surfaces.length === 1 && surfaces[0] === SURFACE_FUERA_DE_ALCANCE);
-        const empiezaSesion = event.type === "user_message" && soloFueraDeAlcance;
+        const empiezaSesion = event.type === "user_message" && event.inicioSesion === true;
 
         const precargados = await precargarContexto(mcp, empiezaSesion);
         const tMcp = Date.now();
