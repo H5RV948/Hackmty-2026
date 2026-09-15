@@ -42,6 +42,22 @@ const PROPS_OBLIGATORIAS: Record<string, string[]> = Object.fromEntries(
   ]),
 );
 
+/**
+ * Props que SI existen en el catalogo para cada componente, para distinguir
+ * "esta clave esta de mas" de "esta clave es la prop obligatoria mal escrita".
+ * El componente es `passthrough()` a proposito, asi que una clave inventada
+ * (el modelo escribe "verdict" en ingles en vez de "veredicto") pasa el
+ * validador en silencio y encima nunca se corrige: el error solo dice que
+ * falta la prop, no que sobra una que se le parece.
+ */
+const PROPS_CONOCIDAS: Record<string, Set<string>> = Object.fromEntries(
+  Object.entries(COMPONENTES_CATALOGO).map(([nombre, def]) => [
+    nombre,
+    new Set(Object.keys(def.props ?? {})),
+  ]),
+);
+const CLAVES_BASE_COMPONENTE = new Set(["id", "component", "children", "action"]);
+
 const version = z.literal(A2UI_VERSION);
 
 const binding = z.object({ path: z.string().startsWith("/") });
@@ -170,13 +186,26 @@ export function validateA2UI(input: unknown): ValidationResult {
     // Props obligatorias del catalogo. Una cadena vacia cuenta como ausente:
     // un titulo en blanco es lo mismo que no tener titulo.
     for (const c of components) {
-      for (const prop of PROPS_OBLIGATORIAS[c.component] ?? []) {
+      const faltantes = (PROPS_OBLIGATORIAS[c.component] ?? []).filter((prop) => {
         const valor = (c as Record<string, unknown>)[prop];
-        if (valor === undefined || valor === null || valor === "") {
-          errors.push(
-            `${c.id} (${c.component}): falta la prop obligatoria "${prop}". El catalogo la exige y el widget la dibuja: sin ella la tarjeta sale incompleta.`,
-          );
-        }
+        return valor === undefined || valor === null || valor === "";
+      });
+      if (faltantes.length === 0) continue;
+
+      const conocidas = PROPS_CONOCIDAS[c.component] ?? new Set<string>();
+      const desconocidas = Object.keys(c as Record<string, unknown>).filter(
+        (k) => !CLAVES_BASE_COMPONENTE.has(k) && !conocidas.has(k),
+      );
+      const pista = desconocidas.length
+        ? ` Ojo: trae esta(s) clave(s) que NO existen en el catalogo para ${c.component}: ${desconocidas
+            .map((k) => `"${k}"`)
+            .join(", ")}. Si alguna es la misma informacion con otro nombre (ingles, mal escrita), renombrala a la prop del catalogo en vez de agregar una nueva.`
+        : "";
+
+      for (const prop of faltantes) {
+        errors.push(
+          `${c.id} (${c.component}): falta la prop obligatoria "${prop}". El catalogo la exige y el widget la dibuja: sin ella la tarjeta sale incompleta.${pista}`,
+        );
       }
     }
 
