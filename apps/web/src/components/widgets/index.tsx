@@ -94,6 +94,11 @@ export function CashflowChart({ titulo, subtitulo, serie }: WidgetProps) {
         <LienzoSerie
           modo="area"
           unidad="$"
+          // Sin forzar el cero: ingreso y gasto varian poco mes a mes frente a
+          // su propio tamano, y con el cero como piso esa variacion real se
+          // aplasta en una linea casi recta. El hueco entre las dos curvas
+          // sigue siendo el mismo porque ambas comparten la misma escala.
+          incluirCero={false}
           etiquetas={meses.map((m) => m.mes)}
           series={[
             { id: "ingreso", nombre: "Ingreso", valores: meses.map((m) => m.ingreso), color: COLORES_SERIE[2] },
@@ -1674,7 +1679,11 @@ export function LineChart({ titulo, subtitulo, unidad, etiquetas, series, refere
           unidad={unidad}
           etiquetas={et}
           series={lista}
-          incluirCero={unidad === "$" || unidad === "%"}
+          // Con el cero forzado, ingreso/gastos/ahorro (unidad "$") se ven como
+          // linea recta: son cifras grandes con variacion mensual chica frente
+          // a su propio tamano. El "%" si conserva el cero porque ahi el 0 es
+          // un piso con significado (0% de uso de linea).
+          incluirCero={unidad === "%"}
           referencia={typeof ref?.valor === "number" ? { valor: ref.valor, etiqueta: ref.etiqueta } : undefined}
         />
       )}
